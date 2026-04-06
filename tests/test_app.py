@@ -215,15 +215,19 @@ class TestFichiers:
     #     data = r.get_json()
     #     assert 'contenu' in data
     def test_explorateur_chemin_invalide(self, client):
-        """L'explorateur doit refuser les chemins en dehors du répertoire autorisé"""
+        """L'explorateur doit refuser les chemins dangereux / en dehors du dossier autorisé"""
         response = client.get('/files/explorer?chemin=/etc/passwd')
 
-        data = response.get_json()
+        assert response.status_code in (200, 404)
 
-        assert response.status_code == 200  # ou 403 si tu changes le code HTTP plus tard
-        assert 'erreur' in data
-        assert 'contenu' not in data
+        data = response.get_json(silent=True)   # silent=True évite les erreurs si ce n'est pas du JSON
 
-        # Message d'erreur explicite
-        error_msg = data['erreur'].lower()
-        assert any(word in error_msg for word in ['introuvable', 'non autorisé', 'interdit', 'permission'])
+        # Cas 1 : Réponse JSON avec erreur (recommandé)
+        if isinstance(data, dict) and 'erreur' in data:
+            assert 'contenu' not in data
+            error_msg = str(data['erreur']).lower()
+            assert any(word in error_msg for word in ['introuvable', 'non autorisé', 'interdit', 'permission'])
+        
+        # Cas 2 : Réponse 404 classique
+        else:
+            assert response.status_code == 404

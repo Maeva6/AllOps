@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" width="520" height="160">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&amp;display=swap');
+    </style>
+  </defs>
+
+  <!-- Icon: stacked layers representing files + shield badge -->
+  <g transform="translate(28, 20)">
+
+    <!-- Back layer (file) -->
+    <rect x="10" y="16" width="72" height="88" rx="6" fill="#C0DD97"/>
+    <!-- Middle layer (file) -->
+    <rect x="5" y="10" width="72" height="88" rx="6" fill="#639922"/>
+    <!-- Front layer (file) -->
+    <rect x="0" y="4" width="72" height="88" rx="6" fill="#27500A"/>
+
+    <!-- Folded corner top-right on front file -->
+    <path d="M50 4 L72 26 L50 26 Z" fill="#3B6D11"/>
+    <path d="M50 4 L72 4 L72 26 Z" fill="#C0DD97" opacity="0.4"/>
+
+    <!-- Lines on front file -->
+    <line x1="10" y1="42" x2="62" y2="42" stroke="#C0DD97" stroke-width="3" stroke-linecap="round"/>
+    <line x1="10" y1="54" x2="62" y2="54" stroke="#C0DD97" stroke-width="3" stroke-linecap="round"/>
+    <line x1="10" y1="66" x2="44" y2="66" stroke="#C0DD97" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Certification badge (bottom-right overlap) -->
+    <circle cx="80" cy="88" r="26" fill="#fff"/>
+    <circle cx="80" cy="88" r="23" fill="#BA7517"/>
+    <circle cx="80" cy="88" r="18" fill="#EF9F27"/>
+    <!-- Star rays -->
+    <path d="M80 65 L83 75 L93 72 L86 80 L93 88 L83 85 L80 95 L77 85 L67 88 L74 80 L67 72 L77 75 Z" fill="#FAC775" opacity="0.5"/>
+    <!-- Checkmark -->
+    <path d="M70 88 L77 96 L91 80" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Vertical separator -->
+  <line x1="148" y1="30" x2="148" y2="130" stroke="#C0DD97" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- ALLOPS main text -->
+  <text
+    x="175"
+    y="105"
+    font-family="'Outfit', 'Trebuchet MS', Arial Black, sans-serif"
+    font-size="82"
+    font-weight="800"
+    letter-spacing="-3"
+    fill="#27500A"
+  >All<tspan fill="#BA7517">Ops</tspan></text>
+
+  <!-- Tagline -->
+  <text
+    x="176"
+    y="128"
+    font-family="'Outfit', 'Trebuchet MS', Arial, sans-serif"
+    font-size="13"
+    font-weight="400"
+    letter-spacing="4"
+    fill="#888780"
+  >FICHIERS &amp; CERTIFICATIONS</text>
+</svg>

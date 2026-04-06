@@ -209,8 +209,26 @@ class TestFichiers:
         r = client.get('/files/historique')
         assert r.status_code == 200
 
-    def test_explorateur_chemin_invalide(self, client):
-        """L'explorateur avec un chemin non autorisé doit rediriger vers home"""
-        r = client.get('/files/explorer?chemin=/etc/passwd')
-        data = r.get_json()
-        assert 'contenu' in data
+    # def test_explorateur_chemin_invalide(self, client):
+    #     """L'explorateur avec un chemin non autorisé doit rediriger vers home"""
+    #     r = client.get('/files/explorer?chemin=/etc/passwd')
+    #     data = r.get_json()
+    #     assert 'contenu' in data
+    def test_explorateur_chemin_invalide(self):
+    """Test que l'on renvoie bien une erreur quand le chemin est invalide"""
+    with self.app.test_client() as client:
+        # Exemple : chemin qui n'existe pas
+        response = client.get('/explorateur?chemin=/chemin/qui/n/existe/pas')
+        # ou selon ta route exacte :
+        # response = client.post('/api/explorateur', json={'chemin': '/dossier/invalide'})
+        
+        assert response.status_code in (400, 404)   # ou 200 si tu renvoies toujours du JSON
+        
+        data = response.get_json()                  # Important : utilise get_json()
+        
+        # Vérifications adaptées au cas d'erreur
+        assert data is not None
+        assert 'erreur' in data
+        assert data['erreur'] == 'Dossier introuvable'
+        # Optionnel : vérifier qu'il n'y a pas de 'contenu'
+        assert 'contenu' not in data

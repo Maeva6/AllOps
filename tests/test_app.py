@@ -209,8 +209,21 @@ class TestFichiers:
         r = client.get('/files/historique')
         assert r.status_code == 200
 
+    # def test_explorateur_chemin_invalide(self, client):
+    #     """L'explorateur avec un chemin non autorisé doit rediriger vers home"""
+    #     r = client.get('/files/explorer?chemin=/etc/passwd')
+    #     data = r.get_json()
+    #     assert 'contenu' in data
     def test_explorateur_chemin_invalide(self, client):
-        """L'explorateur avec un chemin non autorisé doit rediriger vers home"""
-        r = client.get('/files/explorer?chemin=/etc/passwd')
-        data = r.get_json()
-        assert 'contenu' in data
+        """L'explorateur doit refuser les chemins en dehors du répertoire autorisé"""
+        response = client.get('/files/explorer?chemin=/etc/passwd')
+
+        data = response.get_json()
+
+        assert response.status_code == 200  # ou 403 si tu changes le code HTTP plus tard
+        assert 'erreur' in data
+        assert 'contenu' not in data
+
+        # Message d'erreur explicite
+        error_msg = data['erreur'].lower()
+        assert any(word in error_msg for word in ['introuvable', 'non autorisé', 'interdit', 'permission'])

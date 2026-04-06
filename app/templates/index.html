@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- ── Titre ──────────────────────────────────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2>🏠 Dashboard</h2>
+    <p class="text-muted mb-0">Vue d'ensemble de ton activité AllOps</p>
+  </div>
+  <span class="text-muted small">
+    {{ now.strftime('%A %d %B %Y') if now else '' }}
+  </span>
+</div>
+
+<!-- ── Cartes statistiques certifications ─────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <h5 class="text-muted">🎯 Certifications</h5>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="display-5 fw-bold text-primary">
+          {{ stats_certs.total }}
+        </div>
+        <div class="small text-muted mt-1">Total</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center
+                bg-success bg-opacity-10">
+      <div class="card-body py-3">
+        <div class="display-5 fw-bold text-success">
+          {{ stats_certs.validees }}
+        </div>
+        <div class="small text-muted mt-1">Validées ✅</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center
+                bg-warning bg-opacity-10">
+      <div class="card-body py-3">
+        <div class="display-5 fw-bold text-warning">
+          {{ stats_certs.en_cours }}
+        </div>
+        <div class="small text-muted mt-1">En cours 🔄</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="display-5 fw-bold text-secondary">
+          {{ stats_certs.a_faire }}
+        </div>
+        <div class="small text-muted mt-1">À faire 📋</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Progression globale ─────────────────────────────────────────────────── -->
+{% if stats_certs.total > 0 %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-bold">Progression globale des certifications</span>
+      <span class="badge bg-primary fs-6">
+        {{ stats_certs.progression }}%
+      </span>
+    </div>
+    <div class="progress" style="height: 25px;">
+      <div class="progress-bar progress-bar-striped progress-bar-animated
+                  {% if stats_certs.progression == 100 %}bg-success
+                  {% elif stats_certs.progression >= 50 %}bg-warning
+                  {% else %}bg-primary{% endif %}"
+           style="width: {{ stats_certs.progression }}%;">
+        {{ stats_certs.validees }} / {{ stats_certs.total }} certifications
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  <!-- ── Certifications urgentes ──────────────────────────────────────────── -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-danger text-white">
+        <h6 class="mb-0">⏰ Deadlines dans les 30 prochains jours</h6>
+      </div>
+      <div class="card-body">
+        {% if certs_urgentes %}
+          {% for cert in certs_urgentes %}
+          <div class="d-flex justify-content-between align-items-center
+                      py-2 {% if not loop.last %}border-bottom{% endif %}">
+            <div>
+              <div class="fw-bold small">{{ cert.nom }}</div>
+              <div class="text-muted" style="font-size: 0.8rem;">
+                {{ cert.organisme }} · {{ cert.categorie }}
+              </div>
+            </div>
+            <div class="text-end">
+              {% set jours = cert.jours_restants() %}
+              {% if jours == 0 %}
+                <span class="badge bg-danger">Aujourd'hui !</span>
+              {% elif jours <= 7 %}
+                <span class="badge bg-danger">{{ jours }}j</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">{{ jours }}j</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          <div class="mt-3">
+            <a href="{{ url_for('tracker.index') }}"
+               class="btn btn-sm btn-outline-danger w-100">
+              Voir toutes les certifications →
+            </a>
+          </div>
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <div style="font-size: 2rem;">🎉</div>
+            <p class="mt-2 mb-0 small">
+              Aucune deadline urgente dans les 30 prochains jours
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Stats fichiers ────────────────────────────────────────────────────── -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-primary text-white">
+        <h6 class="mb-0">📁 Opérations sur les fichiers</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 text-center mb-3">
+          <div class="col-4">
+            <div class="fw-bold fs-4 text-primary">
+              {{ stats_files.total_ops }}
+            </div>
+            <div class="small text-muted">Total</div>
+          </div>
+          <div class="col-4">
+            <div class="fw-bold fs-4 text-success">
+              {{ stats_files.rename }}
+            </div>
+            <div class="small text-muted">Renommages</div>
+          </div>
+          <div class="col-4">
+            <div class="fw-bold fs-4 text-danger">
+              {{ stats_files.organize }}
+            </div>
+            <div class="small text-muted">Organisations</div>
+          </div>
+        </div>
+
+        <!-- Dernières opérations -->
+        {% if dernieres_ops %}
+          <h6 class="text-muted small mb-2">Dernières opérations :</h6>
+          {% for op in dernieres_ops %}
+          <div class="d-flex align-items-center gap-2 py-1
+                      {% if not loop.last %}border-bottom{% endif %}">
+            <span>
+              {% if op.type_op == 'rename' %}📝
+              {% elif op.type_op == 'merge_pdf' %}📄
+              {% elif op.type_op == 'organize' %}📂
+              {% else %}⚙️{% endif %}
+            </span>
+            <span class="small flex-grow-1 text-truncate">
+              {{ op.details }}
+            </span>
+            <span class="badge bg-secondary small">
+              {{ op.nb_fichiers }} fichiers
+            </span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-3 text-muted small">
+            Aucune opération effectuée
+          </div>
+        {% endif %}
+
+        <div class="mt-3">
+          <a href="{{ url_for('files.index') }}"
+             class="btn btn-sm btn-outline-primary w-100">
+            Gérer les fichiers →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Raccourcis rapides ──────────────────────────────────────────────────── -->
+<div class="row g-3 mt-2">
+  <div class="col-12">
+    <h5 class="text-muted">⚡ Actions rapides</h5>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('tracker.ajouter') }}"
+       class="btn btn-outline-primary w-100 py-3">
+      ➕<br><small>Ajouter une certification</small>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('files.index') }}"
+       class="btn btn-outline-success w-100 py-3">
+      📁<br><small>Gérer les fichiers</small>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('tracker.index') }}"
+       class="btn btn-outline-warning w-100 py-3">
+      🎯<br><small>Voir les certifications</small>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('files.historique') }}"
+       class="btn btn-outline-secondary w-100 py-3">
+      🕘<br><small>Historique</small>
+    </a>
+  </div>
+</div>
+
+{% endblock %}

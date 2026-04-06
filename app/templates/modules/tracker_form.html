@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{{ url_for('tracker.index') }}" class="btn btn-outline-secondary">
+        ← Retour
+      </a>
+      <h2 class="mb-0">{{ title }}</h2>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+
+          <div class="row g-3">
+
+            <!-- Nom -->
+            <div class="col-12">
+              <label class="form-label fw-bold">Nom de la certification *</label>
+              <input type="text" name="nom" class="form-control form-control-lg"
+                     placeholder="AWS Certified Cloud Practitioner"
+                     value="{{ cert.nom if cert else '' }}" required>
+            </div>
+
+            <!-- Organisme + Catégorie -->
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Organisme *</label>
+              <input type="text" name="organisme" class="form-control"
+                     placeholder="AWS, Docker, Linux Foundation..."
+                     value="{{ cert.organisme if cert else '' }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Catégorie *</label>
+              <select name="categorie" class="form-select">
+                {% for cat in ['Cloud', 'DevOps', 'Sécurité', 'Linux',
+                               'Réseau', 'Python', 'Docker', 'Kubernetes',
+                               'CI/CD', 'Langues', 'Autre'] %}
+                  <option {% if cert and cert.categorie == cat %}selected{% endif %}>
+                    {{ cat }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Statut + Gratuite -->
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Statut</label>
+              <select name="statut" class="form-select">
+                {% for s in ['A faire', 'En cours', 'Validée'] %}
+                  <option {% if cert and cert.statut == s %}selected{% endif %}>
+                    {{ s }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="form-check form-switch fs-5">
+                <input class="form-check-input" type="checkbox"
+                       name="gratuite" id="gratuite"
+                       {% if cert and cert.gratuite %}checked{% endif %}>
+                <label class="form-check-label" for="gratuite">
+                  Certification gratuite
+                </label>
+              </div>
+            </div>
+
+            <!-- Niveaux -->
+            <div class="col-md-6">
+              <label class="form-label fw-bold">
+                Niveau actuel :
+                <span id="valNiveau" class="text-primary">
+                  {{ cert.niveau if cert else 1 }}
+                </span> / 5
+              </label>
+              <input type="range" name="niveau" class="form-range"
+                     min="1" max="5" step="1"
+                     value="{{ cert.niveau if cert else 1 }}"
+                     oninput="document.getElementById('valNiveau').textContent=this.value">
+              <div class="d-flex justify-content-between small text-muted">
+                <span>1 J'ignore</span><span>2 Je découvre</span>
+                <span>3 Je sais faire</span><span>4 Je maîtrise</span>
+                <span>5 Expert</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">
+                Niveau visé :
+                <span id="valNiveauVise" class="text-success">
+                  {{ cert.niveau_vise if cert else 3 }}
+                </span> / 5
+              </label>
+              <input type="range" name="niveau_vise" class="form-range"
+                     min="1" max="5" step="1"
+                     value="{{ cert.niveau_vise if cert else 3 }}"
+                     oninput="document.getElementById('valNiveauVise').textContent=this.value">
+              <div class="d-flex justify-content-between small text-muted">
+                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+              </div>
+            </div>
+
+            <!-- Deadline -->
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Deadline (optionnel)</label>
+              <input type="date" name="deadline" class="form-control"
+                     value="{{ cert.deadline.strftime('%Y-%m-%d')
+                              if cert and cert.deadline else '' }}">
+            </div>
+
+            <!-- Notes -->
+            <div class="col-12">
+              <label class="form-label fw-bold">Notes / Prérequis</label>
+              <textarea name="notes" class="form-control" rows="3"
+                        placeholder="Prérequis, liens utiles, ressources...">
+                {{- cert.notes if cert else '' -}}
+              </textarea>
+            </div>
+
+          </div>
+
+          <!-- Boutons -->
+          <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+              {% if cert %}💾 Enregistrer les modifications
+              {% else %}➕ Ajouter la certification{% endif %}
+            </button>
+            <a href="{{ url_for('tracker.index') }}"
+               class="btn btn-outline-secondary btn-lg">Annuler</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

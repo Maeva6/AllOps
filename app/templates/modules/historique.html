@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('files.index') }}" class="btn btn-outline-secondary">
+    ← Retour
+  </a>
+  <h2 class="mb-0">🕘 Historique des Organisations</h2>
+</div>
+
+<!-- Messages flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show">
+        {{ message | safe }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+{% if snapshots %}
+  {% for snap in snapshots %}
+  <div class="card mb-3 shadow-sm
+    {% if snap.annule %}border-secondary opacity-75{% else %}border-success{% endif %}">
+    <div class="card-body">
+      <div class="row align-items-center">
+
+        <div class="col-md-6">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            {% if snap.annule %}
+              <span class="badge bg-secondary">↩️ Annulée</span>
+            {% else %}
+              <span class="badge bg-success">✅ Active</span>
+            {% endif %}
+            <span class="text-muted small">
+              {{ snap.created_at.strftime('%d/%m/%Y à %H:%M') }}
+            </span>
+          </div>
+          <div class="fw-bold">📂 {{ snap.dossier }}</div>
+          <div class="text-muted small mt-1">
+            {{ snap.nb_fichiers }} fichier(s) déplacé(s)
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <!-- Détail des mouvements -->
+          <details>
+            <summary class="text-muted small" style="cursor: pointer;">
+              Voir les {{ snap.nb_fichiers }} déplacements
+            </summary>
+            <ul class="small mt-2 mb-0">
+              {% for mv in snap.get_mouvements()[:5] %}
+                <li>
+                  <code>{{ mv.nom_fichier }}</code>
+                  → {{ mv.destination.split('/')[-2] }}/
+                </li>
+              {% endfor %}
+              {% if snap.nb_fichiers > 5 %}
+                <li class="text-muted">
+                  ... et {{ snap.nb_fichiers - 5 }} autre(s)
+                </li>
+              {% endif %}
+            </ul>
+          </details>
+        </div>
+
+        <div class="col-md-2 text-end">
+          {% if not snap.annule %}
+            <a href="{{ url_for('files.annuler_organisation', id=snap.id) }}"
+               class="btn btn-warning btn-sm"
+               onclick="return confirm(
+                 'Remettre les {{ snap.nb_fichiers }} fichiers à leur place ?'
+               )">
+              ↩️ Annuler
+            </a>
+          {% else %}
+            <span class="text-muted small">Action annulée</span>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div class="text-center py-5 text-muted">
+    <div style="font-size: 3rem;">📭</div>
+    <p class="mt-3">Aucune organisation effectuée pour l'instant.</p>
+  </div>
+{% endif %}
+
+{% endblock %}

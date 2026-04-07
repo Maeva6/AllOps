@@ -139,7 +139,7 @@ Tests    : pytest + pytest-flask + pytest-cov
 ### Démarrage en 3 commandes
 ```bash
 # 1. Cloner le projet
-git clone https://github.com/TON_USERNAME/AllOps.git
+git clone https://github.com/Maeva6/AllOps.git
 cd AllOps
 
 # 2. Copier la configuration

@@ -158,42 +158,48 @@
     </div>
   </div>
 
-  <!-- Organisation -->
-  <div class="col-md-4">
-    <div class="card h-100 shadow-sm">
-      <div class="card-header bg-success text-white">
-        <h5 class="mb-0">📂 Organisation automatique</h5>
-      </div>
-      <div class="card-body">
-        <p class="text-muted small">Range les fichiers par catégorie :</p>
-        <ul class="small text-muted">
-          <li>🖼️ Images (jpg, png...)</li>
-          <li>📄 Documents (pdf, docx...)</li>
-          <li>📊 Tableurs (xlsx, csv...)</li>
-          <li>💻 Code (py, js, html...)</li>
-          <li>🗜️ Archives (zip, tar...)</li>
-        </ul>
-        <form action="{{ url_for('files.organiser') }}" method="POST">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Dossier à organiser</label>
-            <div class="input-group">
-              <input type="text" name="dossier_org" id="dossier_org"
-                     class="form-control"
-                     placeholder="/home/maeva/Téléchargements" required>
-              <button type="button" class="btn btn-outline-secondary"
-                      onclick="ouvrirExplorateur('dossier_org')">
-                📂
-              </button>
-            </div>
+<!-- ── Organisation automatique ────────────────────────────────────────── -->
+<div class="col-md-4">
+  <div class="card h-100 shadow-sm">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0">📂 Organisation automatique</h5>
+    </div>
+    <div class="card-body">
+      <p class="text-muted small">Range les fichiers par catégorie.</p>
+
+      <form id="formOrganiser"
+            action="{{ url_for('files.organiser') }}" method="POST">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Dossier à organiser</label>
+          <div class="input-group">
+            <input type="text" name="dossier_org" id="dossier_org"
+                   class="form-control"
+                   placeholder="/home/maeva/Téléchargements" required>
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="ouvrirExplorateur('dossier_org')">📂</button>
           </div>
-          <button type="submit" class="btn btn-success w-100">
-            ✨ Organiser
-          </button>
-        </form>
-      </div>
+        </div>
+
+        <!-- Aperçu avant organisation -->
+        <button type="button" class="btn btn-outline-success w-100 mb-2"
+                onclick="afficherApercu()">
+          🔍 Aperçu avant organisation
+        </button>
+
+        <!-- Zone aperçu -->
+        <div id="zoneApercu" class="d-none mb-3">
+          <div id="contenuApercu"
+               class="border rounded p-2 bg-light"
+               style="max-height: 200px; overflow-y: auto; font-size: 0.8rem;">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">
+          ✨ Organiser
+        </button>
+      </form>
     </div>
   </div>
-
 </div>
 
 <!-- ── Historique ─────────────────────────────────────────────────────────── -->
@@ -353,6 +359,59 @@ document.getElementById('btnConfirmerDossier').addEventListener('click', () => {
     document.getElementById('explorateurModal')
   ).hide();
 });
+
+// Aperçu organisation
+function afficherApercu() {
+  const dossier = document.getElementById('dossier_org').value.trim();
+  if (!dossier) {
+    alert('Indique d\'abord un dossier.');
+    return;
+  }
+
+  const zone = document.getElementById('zoneApercu');
+  const contenu = document.getElementById('contenuApercu');
+  contenu.innerHTML = '⏳ Analyse en cours...';
+  zone.classList.remove('d-none');
+
+  fetch('/files/apercu-organisation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `dossier_org=${encodeURIComponent(dossier)}`
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.erreur) {
+      contenu.innerHTML = `<span class="text-danger">❌ ${data.erreur}</span>`;
+      return;
+    }
+
+    let html = `<div class="mb-2 fw-bold">
+      📊 ${data.total} fichier(s) → ${data.nb_categories} catégorie(s)
+    </div>`;
+
+    const couleurs = {
+      'Images': 'success', 'Documents': 'primary', 'Tableurs': 'info',
+      'Slides': 'warning', 'Archives': 'secondary', 'Code': 'dark',
+      'Videos': 'danger', 'Audio': 'info', 'Autres': 'secondary'
+    };
+
+    for (const [cat, fichiers] of Object.entries(data.apercu)) {
+      const couleur = couleurs[cat] || 'secondary';
+      html += `<div class="mb-1">
+        <span class="badge bg-${couleur}">${cat} (${fichiers.length})</span>
+        <span class="text-muted">
+          ${fichiers.slice(0, 3).map(f => f.nom).join(', ')}
+          ${fichiers.length > 3 ? `... +${fichiers.length - 3}` : ''}
+        </span>
+      </div>`;
+    }
+
+    contenu.innerHTML = html;
+  })
+  .catch(() => {
+    contenu.innerHTML = '<span class="text-danger">❌ Erreur de connexion</span>';
+  });
+}
 </script>
 
 {% endblock %}

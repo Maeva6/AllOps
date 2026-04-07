@@ -4,6 +4,7 @@ from app.extensions import db
 from app.routes.main import main_bp
 from app.routes.files import files_bp
 from app.routes.tracker import tracker_bp  
+from app.models import Certification, FileOperation, OrganisationSnapshot, Ressource
 
 from datetime import datetime, timezone
 

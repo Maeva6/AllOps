@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from app.extensions import db
-from app.models import Certification
+from app.models import Certification, Ressource
 from datetime import datetime, date, timezone
+from app.data.ressources_suggestions import get_suggestions
 
 UTC = timezone.utc
 
@@ -123,3 +124,69 @@ def changer_statut(id):
         db.session.commit()
         flash(f'✅ Statut mis à jour : {nouveau_statut}', 'success')
     return redirect(url_for('tracker.index'))
+
+
+# ─── Ressources d'une certification ──────────────────────────────────────────
+@tracker_bp.route('/<int:id>/ressources')
+def ressources(id):
+    cert        = db.session.get(Certification, id) or abort(404)
+    suggestions = get_suggestions(cert.nom, cert.organisme)
+
+    # Filtrer les suggestions pas encore ajoutées
+    urls_existantes = {r.url for r in cert.ressources}
+    suggestions = [
+        s for s in suggestions
+        if s['url'] not in urls_existantes
+    ]
+
+    return render_template(
+        'modules/ressources.html',
+        title=f"Ressources – {cert.nom}",
+        cert=cert,
+        suggestions=suggestions
+    )
+
+
+@tracker_bp.route('/<int:id>/ressources/ajouter', methods=['POST'])
+def ajouter_ressource(id):
+    cert = db.session.get(Certification, id) or abort(404)
+
+    ressource = Ressource(
+        certification_id = id,
+        titre            = request.form.get('titre', '').strip(),
+        url              = request.form.get('url', '').strip(),
+        type_ressource   = request.form.get('type_ressource', 'cours'),
+        gratuit          = 'gratuit' in request.form,
+    )
+    db.session.add(ressource)
+    db.session.commit()
+    flash('✅ Ressource ajoutée !', 'success')
+    return redirect(url_for('tracker.ressources', id=id))
+
+
+@tracker_bp.route('/ressources/supprimer/<int:rid>', methods=['POST'])
+def supprimer_ressource(rid):
+    r    = db.session.get(Ressource, rid) or abort(404)
+    cert_id = r.certification_id
+    db.session.delete(r)
+    db.session.commit()
+    flash('🗑️ Ressource supprimée.', 'warning')
+    return redirect(url_for('tracker.ressources', id=cert_id))
+
+
+@tracker_bp.route('/<int:id>/ressources/importer', methods=['POST'])
+def importer_suggestion(id):
+    """Importer une suggestion en un clic"""
+    cert = db.session.get(Certification, id) or abort(404)
+
+    ressource = Ressource(
+        certification_id = id,
+        titre            = request.form.get('titre', '').strip(),
+        url              = request.form.get('url', '').strip(),
+        type_ressource   = request.form.get('type_ressource', 'cours'),
+        gratuit          = request.form.get('gratuit') == 'true',
+    )
+    db.session.add(ressource)
+    db.session.commit()
+    flash(f'✅ "{ressource.titre}" ajoutée à tes ressources !', 'success')
+    return redirect(url_for('tracker.ressources', id=id))

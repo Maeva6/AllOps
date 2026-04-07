@@ -44,15 +44,24 @@ class FileOperation(db.Model):
     __tablename__ = 'file_operations'
 
     id           = db.Column(db.Integer, primary_key=True)
-    type_op      = db.Column(db.String(50),  nullable=False)  # rename / convert / organize
+    type_op      = db.Column(db.String(50),  nullable=False)
     nb_fichiers  = db.Column(db.Integer,     default=0)
-    details      = db.Column(db.Text,        nullable=True)   # description de l'opération
-    statut       = db.Column(db.String(20),  default='success') # success / error
-    created_at   = db.Column(db.DateTime,    default=datetime.utcnow)
+    details      = db.Column(db.Text,        nullable=True)
+    statut       = db.Column(db.String(20),  default='success')
+    annule       = db.Column(db.Boolean,     default=False)
+    # Données pour le rollback (JSON)
+    rollback_data = db.Column(db.Text,       nullable=True)
+    created_at   = db.Column(db.DateTime,
+                              default=lambda: datetime.now(UTC))
+
+    def get_rollback_data(self):
+        if self.rollback_data:
+            return json.loads(self.rollback_data)
+        return None
 
     def __repr__(self):
         return f'<FileOperation {self.type_op} - {self.created_at}>'
-
+        
 class OrganisationSnapshot(db.Model):
     __tablename__ = 'organisation_snapshots'
 
@@ -68,3 +77,27 @@ class OrganisationSnapshot(db.Model):
 
     def __repr__(self):
         return f'<Snapshot {self.dossier} - {self.created_at}>'
+
+class Ressource(db.Model):
+    __tablename__ = 'ressources'
+
+    id               = db.Column(db.Integer, primary_key=True)
+    certification_id = db.Column(db.Integer,
+                                  db.ForeignKey('certifications.id'),
+                                  nullable=False)
+    titre            = db.Column(db.String(200), nullable=False)
+    url              = db.Column(db.String(500), nullable=False)
+    type_ressource   = db.Column(db.String(50),  nullable=False)
+    # cours / video / doc / pratique / livre
+    gratuit          = db.Column(db.Boolean, default=True)
+    created_at       = db.Column(db.DateTime,
+                                  default=lambda: datetime.now(UTC))
+
+    # Relation avec Certification
+    certification = db.relationship(
+        'Certification',
+        backref=db.backref('ressources', lazy=True, cascade='all, delete-orphan')
+    )
+
+    def __repr__(self):
+        return f'<Ressource {self.titre}>'

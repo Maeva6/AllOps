@@ -21,118 +21,333 @@ def index():
 
 
 # ─── 1. Renommage en masse ────────────────────────────────────────────────────
+# @files_bp.route('/renommer', methods=['POST'])
+# def renommer():
+#     dossier  = request.form.get('dossier', '').strip()
+#     prefixe  = request.form.get('prefixe', '').strip()
+#     suffixe  = request.form.get('suffixe', '').strip()
+#     extension = request.form.get('extension', '').strip().lower()
+
+#     # Vérifications
+#     if not dossier:
+#         flash('Veuillez indiquer un dossier.', 'danger')
+#         return redirect(url_for('files.index'))
+
+#     if not os.path.isdir(dossier):
+#         flash(f'Dossier introuvable : {dossier}', 'danger')
+#         return redirect(url_for('files.index'))
+
+#     # Lister les fichiers
+#     fichiers = [
+#         f for f in os.listdir(dossier)
+#         if os.path.isfile(os.path.join(dossier, f))
+#         and not f.startswith('.')
+#     ]
+
+#     if extension:
+#         fichiers = [f for f in fichiers if f.endswith(extension)]
+
+#     if not fichiers:
+#         flash('Aucun fichier trouvé dans ce dossier.', 'warning')
+#         return redirect(url_for('files.index'))
+
+#     # Renommer
+#     compteur = 0
+#     date_str = datetime.now().strftime('%Y-%m-%d')
+
+#     for i, fichier in enumerate(sorted(fichiers), start=1):
+#         ext_fichier = os.path.splitext(fichier)[1]
+#         nouveau_nom = f"{prefixe}_{date_str}_{i:02d}{suffixe}{ext_fichier}"
+#         ancien_path = os.path.join(dossier, fichier)
+#         nouveau_path = os.path.join(dossier, nouveau_nom)
+
+#         try:
+#             os.rename(ancien_path, nouveau_path)
+#             compteur += 1
+#         except Exception as e:
+#             flash(f'Erreur sur {fichier} : {str(e)}', 'danger')
+
+#     # Sauvegarder dans la base
+#     op = FileOperation(
+#         type_op='rename',
+#         nb_fichiers=compteur,
+#         details=f"Dossier: {dossier} | Préfixe: {prefixe} | {compteur} fichiers renommés",
+#         statut='success'
+#     )
+#     db.session.add(op)
+#     db.session.commit()
+
+#     flash(f'✅ {compteur} fichier(s) renommé(s) avec succès !', 'success')
+#     return redirect(url_for('files.index'))
+
+
+# # ─── 2. Fusion de PDFs ────────────────────────────────────────────────────────
+# @files_bp.route('/fusionner-pdf', methods=['POST'])
+# def fusionner_pdf():
+#     try:
+#         import fitz  # PyMuPDF
+#     except ImportError:
+#         flash('PyMuPDF non installé.', 'danger')
+#         return redirect(url_for('files.index'))
+
+#     dossier  = request.form.get('dossier_pdf', '').strip()
+#     nom_sortie = request.form.get('nom_sortie', 'fusion_output').strip()
+
+#     if not os.path.isdir(dossier):
+#         flash(f'Dossier introuvable : {dossier}', 'danger')
+#         return redirect(url_for('files.index'))
+
+#     # Lister les PDFs
+#     pdfs = sorted([
+#         f for f in os.listdir(dossier)
+#         if f.lower().endswith('.pdf')
+#     ])
+
+#     if len(pdfs) < 2:
+#         flash('Il faut au moins 2 fichiers PDF dans le dossier.', 'warning')
+#         return redirect(url_for('files.index'))
+
+#     # Fusionner
+#     doc_final = fitz.open()
+#     for pdf in pdfs:
+#         chemin = os.path.join(dossier, pdf)
+#         doc = fitz.open(chemin)
+#         doc_final.insert_pdf(doc)
+#         doc.close()
+
+#     # Sauvegarder
+#     if not nom_sortie.endswith('.pdf'):
+#         nom_sortie += '.pdf'
+#     chemin_sortie = os.path.join(dossier, nom_sortie)
+#     doc_final.save(chemin_sortie)
+#     doc_final.close()
+
+#     # Log en base
+#     op = FileOperation(
+#         type_op='merge_pdf',
+#         nb_fichiers=len(pdfs),
+#         details=f"{len(pdfs)} PDFs fusionnés → {nom_sortie}",
+#         statut='success'
+#     )
+#     db.session.add(op)
+#     db.session.commit()
+
+#     flash(f'✅ {len(pdfs)} PDFs fusionnés → {nom_sortie}', 'success')
+#     return redirect(url_for('files.index'))
+
 @files_bp.route('/renommer', methods=['POST'])
 def renommer():
-    dossier  = request.form.get('dossier', '').strip()
-    prefixe  = request.form.get('prefixe', '').strip()
-    suffixe  = request.form.get('suffixe', '').strip()
+    dossier   = request.form.get('dossier', '').strip()
+    prefixe   = request.form.get('prefixe', '').strip()
+    suffixe   = request.form.get('suffixe', '').strip()
     extension = request.form.get('extension', '').strip().lower()
-
-    # Vérifications
-    if not dossier:
-        flash('Veuillez indiquer un dossier.', 'danger')
-        return redirect(url_for('files.index'))
 
     if not os.path.isdir(dossier):
         flash(f'Dossier introuvable : {dossier}', 'danger')
         return redirect(url_for('files.index'))
 
-    # Lister les fichiers
     fichiers = [
         f for f in os.listdir(dossier)
         if os.path.isfile(os.path.join(dossier, f))
         and not f.startswith('.')
     ]
-
     if extension:
         fichiers = [f for f in fichiers if f.endswith(extension)]
 
     if not fichiers:
-        flash('Aucun fichier trouvé dans ce dossier.', 'warning')
+        flash('Aucun fichier trouvé.', 'warning')
         return redirect(url_for('files.index'))
 
-    # Renommer
-    compteur = 0
-    date_str = datetime.now().strftime('%Y-%m-%d')
+    mouvements = []
+    date_str   = datetime.now().strftime('%Y-%m-%d')
 
     for i, fichier in enumerate(sorted(fichiers), start=1):
-        ext_fichier = os.path.splitext(fichier)[1]
-        nouveau_nom = f"{prefixe}_{date_str}_{i:02d}{suffixe}{ext_fichier}"
-        ancien_path = os.path.join(dossier, fichier)
-        nouveau_path = os.path.join(dossier, nouveau_nom)
+        ext_f       = os.path.splitext(fichier)[1]
+        nouveau_nom = f"{prefixe}_{date_str}_{i:02d}{suffixe}{ext_f}"
+        src         = os.path.join(dossier, fichier)
+        dst         = os.path.join(dossier, nouveau_nom)
 
         try:
-            os.rename(ancien_path, nouveau_path)
-            compteur += 1
+            os.rename(src, dst)
+            mouvements.append({'origine': src, 'destination': dst})
         except Exception as e:
             flash(f'Erreur sur {fichier} : {str(e)}', 'danger')
 
-    # Sauvegarder dans la base
     op = FileOperation(
-        type_op='rename',
-        nb_fichiers=compteur,
-        details=f"Dossier: {dossier} | Préfixe: {prefixe} | {compteur} fichiers renommés",
-        statut='success'
+        type_op       = 'rename',
+        nb_fichiers   = len(mouvements),
+        details       = f"Dossier: {dossier} | Préfixe: {prefixe}",
+        statut        = 'success',
+        annule        = False,
+        rollback_data = json.dumps(mouvements)
     )
     db.session.add(op)
     db.session.commit()
 
-    flash(f'✅ {compteur} fichier(s) renommé(s) avec succès !', 'success')
+    flash(
+        f'✅ {len(mouvements)} fichier(s) renommé(s). '
+        f'<a href="{url_for("files.rollback", id=op.id)}" '
+        f'class="alert-link">↩️ Annuler</a>',
+        'success'
+    )
     return redirect(url_for('files.index'))
 
 
-# ─── 2. Fusion de PDFs ────────────────────────────────────────────────────────
 @files_bp.route('/fusionner-pdf', methods=['POST'])
 def fusionner_pdf():
     try:
-        import fitz  # PyMuPDF
+        import fitz
     except ImportError:
         flash('PyMuPDF non installé.', 'danger')
         return redirect(url_for('files.index'))
 
-    dossier  = request.form.get('dossier_pdf', '').strip()
+    dossier    = request.form.get('dossier_pdf', '').strip()
     nom_sortie = request.form.get('nom_sortie', 'fusion_output').strip()
 
     if not os.path.isdir(dossier):
         flash(f'Dossier introuvable : {dossier}', 'danger')
         return redirect(url_for('files.index'))
 
-    # Lister les PDFs
     pdfs = sorted([
         f for f in os.listdir(dossier)
         if f.lower().endswith('.pdf')
     ])
 
     if len(pdfs) < 2:
-        flash('Il faut au moins 2 fichiers PDF dans le dossier.', 'warning')
+        flash('Il faut au moins 2 fichiers PDF.', 'warning')
         return redirect(url_for('files.index'))
 
-    # Fusionner
-    doc_final = fitz.open()
-    for pdf in pdfs:
-        chemin = os.path.join(dossier, pdf)
-        doc = fitz.open(chemin)
-        doc_final.insert_pdf(doc)
-        doc.close()
-
-    # Sauvegarder
     if not nom_sortie.endswith('.pdf'):
         nom_sortie += '.pdf'
+
     chemin_sortie = os.path.join(dossier, nom_sortie)
+
+    doc_final = fitz.open()
+    for pdf in pdfs:
+        doc = fitz.open(os.path.join(dossier, pdf))
+        doc_final.insert_pdf(doc)
+        doc.close()
     doc_final.save(chemin_sortie)
     doc_final.close()
 
-    # Log en base
+    # Rollback = supprimer le fichier créé
+    rollback = {'fichier_cree': chemin_sortie}
+
     op = FileOperation(
-        type_op='merge_pdf',
-        nb_fichiers=len(pdfs),
-        details=f"{len(pdfs)} PDFs fusionnés → {nom_sortie}",
-        statut='success'
+        type_op       = 'merge_pdf',
+        nb_fichiers   = len(pdfs),
+        details       = f"{len(pdfs)} PDFs fusionnés → {nom_sortie}",
+        statut        = 'success',
+        annule        = False,
+        rollback_data = json.dumps(rollback)
     )
     db.session.add(op)
     db.session.commit()
 
-    flash(f'✅ {len(pdfs)} PDFs fusionnés → {nom_sortie}', 'success')
+    flash(
+        f'✅ {len(pdfs)} PDFs fusionnés → {nom_sortie}. '
+        f'<a href="{url_for("files.rollback", id=op.id)}" '
+        f'class="alert-link">↩️ Annuler</a>',
+        'success'
+    )
+    return redirect(url_for('files.index'))
+
+
+# ─── Rollback universel (rename + fusion + organisation) ─────────────────────
+@files_bp.route('/rollback/<int:id>')
+def rollback(id):
+    op = db.session.get(FileOperation, id)
+    if not op:
+        abort(404)
+
+    if op.annule:
+        flash('⚠️ Cette action a déjà été annulée.', 'warning')
+        return redirect(url_for('files.index'))
+
+    data    = op.get_rollback_data()
+    erreurs = []
+    succes  = 0
+
+    # ── Rollback renommage ────────────────────────────────────────────────────
+    if op.type_op == 'rename':
+        for mv in data:
+            src = mv['destination']
+            dst = mv['origine']
+            if not os.path.exists(src):
+                erreurs.append(os.path.basename(src))
+                continue
+            try:
+                os.rename(src, dst)
+                succes += 1
+            except Exception as e:
+                erreurs.append(str(e))
+
+    # ── Rollback fusion PDF ───────────────────────────────────────────────────
+    elif op.type_op == 'merge_pdf':
+        fichier = data.get('fichier_cree')
+        if fichier and os.path.exists(fichier):
+            try:
+                os.remove(fichier)
+                succes = 1
+            except Exception as e:
+                erreurs.append(str(e))
+        else:
+            erreurs.append('Fichier fusionné introuvable')
+
+    # ── Rollback organisation ─────────────────────────────────────────────────
+    elif op.type_op == 'organize':
+        # Récupérer mouvements et dossiers créés depuis le JSON
+        mouvements     = data.get('mouvements', [])
+        dossiers_crees = data.get('dossiers_crees', [])
+
+        for mv in mouvements:
+            src = mv['destination']
+            dst = mv['origine']
+            if not os.path.exists(src):
+                erreurs.append(os.path.basename(src))
+                continue
+            try:
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                if os.path.exists(dst):
+                    base, ext_f = os.path.splitext(os.path.basename(dst))
+                    dst = os.path.join(
+                        os.path.dirname(dst),
+                        f"{base}_restaure_{datetime.now().strftime('%H%M%S')}{ext_f}"
+                    )
+                shutil.move(src, dst)
+                succes += 1
+            except Exception as e:
+                erreurs.append(str(e))
+
+        # Supprimer les dossiers créés (du plus profond au plus haut)
+        for d in sorted(dossiers_crees, reverse=True):
+            try:
+                contenu_visible = [
+                    f for f in os.listdir(d)
+                    if not f.startswith('.')
+                ]
+                if os.path.isdir(d) and not contenu_visible:
+                    os.rmdir(d)
+            except Exception:
+                pass
+
+    op.annule = True
+    db.session.commit()
+
+    if erreurs:
+        flash(
+            f'↩️ Annulation partielle : {succes} OK. '
+            f'Erreurs : {", ".join(erreurs[:3])}',
+            'warning'
+        )
+    else:
+        msg = {
+            'rename':     f'↩️ {succes} fichier(s) remis à leur nom d\'origine.',
+            'merge_pdf':  '↩️ Fichier fusionné supprimé.',
+            'organize':   f'↩️ {succes} fichier(s) remis en place. Dossiers vides supprimés.',
+        }
+        flash(msg.get(op.type_op, '↩️ Action annulée.'), 'success')
+
     return redirect(url_for('files.index'))
 
 
@@ -230,27 +445,31 @@ def organiser():
     ]
 
     if not fichiers:
-        flash('Aucun fichier trouvé dans ce dossier.', 'warning')
+        flash('Aucun fichier trouvé.', 'warning')
         return redirect(url_for('files.index'))
 
-    mouvements = []  # ← on va tout enregistrer ici
+    mouvements      = []
+    dossiers_crees  = []   # ← on enregistre les dossiers créés
 
     for fichier in fichiers:
         ext = os.path.splitext(fichier)[1].lower()
-        dossier_cible = 'Autres'
-
-        for categorie, extensions in regles.items():
+        categorie = 'Autres'
+        for cat, extensions in regles.items():
             if ext in extensions:
-                dossier_cible = categorie
+                categorie = cat
                 break
 
-        chemin_cible = os.path.join(dossier, dossier_cible)
+        chemin_cible = os.path.join(dossier, categorie)
+
+        # Enregistrer si le dossier n'existait pas encore
+        if not os.path.exists(chemin_cible):
+            dossiers_crees.append(chemin_cible)
+
         os.makedirs(chemin_cible, exist_ok=True)
 
         src = os.path.join(dossier, fichier)
         dst = os.path.join(chemin_cible, fichier)
 
-        # Éviter d'écraser un fichier existant
         if os.path.exists(dst):
             base, ext_f = os.path.splitext(fichier)
             dst = os.path.join(
@@ -259,41 +478,35 @@ def organiser():
             )
 
         shutil.move(src, dst)
-
-        # Sauvegarder le mouvement pour le rollback
         mouvements.append({
-            'origine':      src,
-            'destination':  dst,
-            'nom_fichier':  fichier
+            'origine':     src,
+            'destination': dst
         })
 
-    # Sauvegarder le snapshot en base
-    snapshot = OrganisationSnapshot(
-        dossier     = dossier,
-        mouvements  = json.dumps(mouvements),
-        nb_fichiers = len(mouvements),
-        annule      = False
-    )
-    db.session.add(snapshot)
+    # Sauvegarder mouvements ET dossiers créés
+    rollback_data = json.dumps({
+        'mouvements':     mouvements,
+        'dossiers_crees': dossiers_crees   # ← nouveau
+    })
 
-    # Log habituel
     op = FileOperation(
-        type_op     = 'organize',
-        nb_fichiers = len(mouvements),
-        details     = f"Dossier: {dossier} | {len(mouvements)} fichiers organisés",
-        statut      = 'success'
+        type_op       = 'organize',
+        nb_fichiers   = len(mouvements),
+        details       = f"Dossier: {dossier} | {len(mouvements)} fichiers organisés",
+        statut        = 'success',
+        annule        = False,
+        rollback_data = rollback_data
     )
     db.session.add(op)
     db.session.commit()
 
     flash(
         f'✅ {len(mouvements)} fichier(s) organisé(s). '
-        f'<a href="{url_for("files.annuler_organisation", id=snapshot.id)}" '
-        f'class="alert-link">↩️ Annuler cette action</a>',
+        f'<a href="{url_for("files.rollback", id=op.id)}" '
+        f'class="alert-link">↩️ Annuler</a>',
         'success'
     )
     return redirect(url_for('files.index'))
-
 
 # ─── Annuler une organisation ─────────────────────────────────────────────────
 @files_bp.route('/annuler-organisation/<int:id>')
@@ -453,3 +666,54 @@ def explorer():
             json.dumps({'erreur': 'Dossier introuvable'}),
             status=404, content_type='application/json'
         )
+
+@files_bp.route('/apercu-organisation', methods=['POST'])
+def apercu_organisation():
+    """Retourne un aperçu des fichiers qui seront déplacés"""
+    dossier = request.form.get('dossier_org', '').strip()
+
+    if not os.path.isdir(dossier):
+        return json.dumps({'erreur': 'Dossier introuvable'}), 404
+
+    regles = {
+        'Images':    ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
+        'Documents': ['.pdf', '.doc', '.docx', '.odt', '.txt', '.md'],
+        'Tableurs':  ['.xls', '.xlsx', '.csv', '.ods'],
+        'Slides':    ['.ppt', '.pptx', '.odp'],
+        'Archives':  ['.zip', '.tar', '.gz', '.rar', '.7z'],
+        'Code':      ['.py', '.js', '.html', '.css', '.java', '.c', '.cpp', '.sh'],
+        'Videos':    ['.mp4', '.avi', '.mkv', '.mov', '.wmv'],
+        'Audio':     ['.mp3', '.wav', '.flac', '.aac'],
+        'Autres':    []
+    }
+
+    apercu = {}
+    fichiers = [
+        f for f in os.listdir(dossier)
+        if os.path.isfile(os.path.join(dossier, f))
+        and not f.startswith('.')
+    ]
+
+    for fichier in fichiers:
+        ext = os.path.splitext(fichier)[1].lower()
+        categorie = 'Autres'
+        for cat, extensions in regles.items():
+            if ext in extensions:
+                categorie = cat
+                break
+
+        if categorie not in apercu:
+            apercu[categorie] = []
+        apercu[categorie].append({
+            'nom': fichier,
+            'ext': ext or 'sans extension'
+        })
+
+    return Response(
+        json.dumps({
+            'apercu':       apercu,
+            'total':        len(fichiers),
+            'nb_categories': len(apercu)
+        }),
+        content_type='application/json'
+    )

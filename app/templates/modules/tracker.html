@@ -179,6 +179,11 @@
               </select>
             </form>
 
+            <a href="{{ url_for('tracker.ressources', id=cert.id) }}"
+   class="btn btn-sm btn-outline-warning">
+  📚 Ressources
+</a>
+
             <a href="{{ url_for('tracker.modifier', id=cert.id) }}"
                class="btn btn-sm btn-outline-primary">✏️</a>
 

@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Correction de devoirs{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Correction de devoirs</h1>
+    <p>Upload ton TP, TD, Corbeille ou Exam — l'IA le corrige avec explications</p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+
+  <!-- ── Formulaire d'upload ─────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <i data-lucide="upload-cloud" class="header-icon"></i>
+      Soumettre un devoir à corriger
+    </div>
+    <div class="card-body">
+      <form action="{{ url_for('correction.soumettre') }}"
+            method="POST" enctype="multipart/form-data"
+            id="formCorrection">
+
+        <div class="form-group">
+          <label class="form-label">Titre du devoir *</label>
+          <input type="text" name="titre" class="form-control"
+                 placeholder="ex: TP3 — Algorithmes de tri, Corbeille Prosit 4…"
+                 required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Type de document</label>
+          <select name="type_doc" class="form-control">
+            {% for key, label in types_doc.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Zone d'upload -->
+        <div class="form-group">
+          <label class="form-label">Fichier (PDF, TXT, Markdown)</label>
+          <div id="dropZone" style="
+            border:2px dashed var(--border-light);
+            border-radius:var(--radius);
+            padding:28px;text-align:center;cursor:pointer;
+            background:var(--bg-elevated);transition:all 0.2s">
+            <i data-lucide="file-up"
+               style="width:32px;height:32px;color:var(--text-muted);
+                      display:block;margin:0 auto 10px;stroke-width:1.5"></i>
+            <div style="font-size:13px;color:var(--text-secondary)">
+              Glisse ton fichier ici ou
+              <label for="fichier"
+                     style="color:var(--accent);cursor:pointer;font-weight:500">
+                parcourir
+              </label>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+              PDF, TXT, Markdown — max 10 Mo
+            </div>
+            <input type="file" id="fichier" name="fichier"
+                   accept=".pdf,.txt,.md" style="display:none"
+                   onchange="onFileSelected(this)">
+          </div>
+
+          <div id="fileInfo" style="display:none;margin-top:8px">
+            <div class="flex items-center gap-2"
+                 style="background:var(--bg-elevated);
+                        border:1px solid var(--border);
+                        border-radius:var(--radius-sm);padding:10px 14px">
+              <i data-lucide="file-text"
+                 style="width:16px;height:16px;color:var(--accent)"></i>
+              <span id="fileName"
+                    style="font-size:13px;flex:1;color:var(--text-primary)">
+              </span>
+              <button type="button" class="btn btn-ghost btn-icon"
+                      onclick="clearFile()">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ou saisie texte -->
+        <div class="form-group">
+          <label class="form-label">
+            — ou colle le texte directement —
+          </label>
+          <textarea name="texte" class="form-control mono" rows="6"
+                    placeholder="Colle l'énoncé du devoir ici si tu n'as pas de fichier…">
+          </textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full"
+                id="btnSoumettre" style="padding:12px;font-size:14px">
+          <i data-lucide="sparkles"></i>
+          Corriger avec l'IA
+        </button>
+
+        <div id="loadingState"
+             style="display:none;text-align:center;padding:24px">
+          <div style="width:40px;height:40px;margin:0 auto 12px;
+                      border:3px solid var(--border);
+                      border-top-color:var(--accent);border-radius:50%;
+                      animation:spin 0.8s linear infinite"></div>
+          <div style="font-size:13px;color:var(--text-secondary)">
+            L'IA analyse et corrige ton devoir…
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            Cela peut prendre 20-30 secondes selon la longueur
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Colonne droite : infos + historique ──────────────────────── -->
+  <div>
+
+    <!-- Ce que l'IA génère -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <i data-lucide="info" class="header-icon"></i>
+        Ce que l'IA génère
+      </div>
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          {% for icon, label, desc in [
+            ('check-circle', 'Réponses correctes',  'Solution complète pour chaque question'),
+            ('book-open',    'Explications',          'Raisonnement étape par étape'),
+            ('tag',          'Notions clés',          'Concepts abordés dans le devoir'),
+            ('alert-circle', 'Conseils',              'Erreurs classiques à éviter'),
+            ('layers',       'Synthèse',              'Résumé pédagogique des notions'),
+            ('file-text',    'Export .tex / Word / PDF', 'Document corrigé téléchargeable'),
+          ] %}
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <i data-lucide="{{ icon }}"
+               style="width:16px;height:16px;color:var(--accent);
+                      flex-shrink:0;margin-top:2px"></i>
+            <div>
+              <div style="font-size:13px;font-weight:600;
+                          color:var(--text-primary)">{{ label }}</div>
+              <div style="font-size:12px;color:var(--text-secondary)">
+                {{ desc }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique des corrections -->
+    {% if sessions %}
+    <div class="card">
+      <div class="card-header">
+        <i data-lucide="history" class="header-icon"></i>
+        Corrections récentes
+      </div>
+      <div style="padding:0">
+        {% for s in sessions %}
+        <div style="
+          display:flex;align-items:center;gap:10px;
+          padding:11px 16px;
+          border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %}">
+
+          <div style="
+            width:32px;height:32px;
+            border-radius:var(--radius-sm);
+            background:{% if s.statut == 'corrige' %}var(--success-dim)
+                       {% elif s.statut == 'erreur' %}var(--danger-dim)
+                       {% else %}var(--warning-dim){% endif %};
+            display:flex;align-items:center;justify-content:center;
+            flex-shrink:0">
+            <i data-lucide="{% if s.statut == 'corrige' %}check
+                            {% elif s.statut == 'erreur' %}x
+                            {% else %}clock{% endif %}"
+               style="width:14px;height:14px;
+                      color:{% if s.statut == 'corrige' %}var(--success)
+                            {% elif s.statut == 'erreur' %}var(--danger)
+                            {% else %}var(--warning){% endif %}">
+            </i>
+          </div>
+
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;
+                        white-space:nowrap;overflow:hidden;
+                        text-overflow:ellipsis;color:var(--text-primary)">
+              {{ s.titre }}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)">
+              {{ types_doc.get(s.type_doc, s.type_doc) }} ·
+              {{ s.created_at.strftime('%d/%m %H:%M') }}
+            </div>
+          </div>
+
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            {% if s.statut == 'corrige' %}
+            <a href="{{ url_for('correction.voir', id=s.id) }}"
+               class="btn btn-secondary btn-sm"
+               title="Voir la correction">
+              <i data-lucide="eye"></i>
+            </a>
+            {% endif %}
+            <form action="{{ url_for('correction.supprimer', id=s.id) }}"
+                  method="POST" style="margin:0">
+              <button class="btn btn-danger btn-sm"
+                      title="Supprimer"
+                      onclick="return confirm('Supprimer cette correction ?')">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </form>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="card-body" style="text-align:center;padding:32px 20px">
+        <i data-lucide="inbox"
+           style="width:36px;height:36px;color:var(--text-muted);
+                  display:block;margin:0 auto 12px;stroke-width:1.5"></i>
+        <div style="font-size:13px;color:var(--text-muted)">
+          Aucune correction pour l'instant
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+#dropZone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+</style>
+<script>
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+});
+dropZone.addEventListener('click', () => {
+  document.getElementById('fichier').click();
+});
+
+function onFileSelected(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(file) {
+  const allowed = ['.pdf', '.txt', '.md'];
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    alert('Format non supporté. Utilise PDF, TXT ou Markdown.');
+    return;
+  }
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileInfo').style.display = 'block';
+  dropZone.style.display = 'none';
+  lucide.createIcons();
+}
+
+function clearFile() {
+  document.getElementById('fichier').value = '';
+  document.getElementById('fileInfo').style.display = 'none';
+  dropZone.style.display = 'block';
+}
+
+// ── Submit avec loading ───────────────────────────────────────────────────────
+document.getElementById('formCorrection').addEventListener('submit', () => {
+  document.getElementById('btnSoumettre').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'block';
+});
+</script>
+{% endblock %}

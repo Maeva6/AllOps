@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Memory{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-3">
+  <a href="{{ url_for('detente.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+  <h1 style="font-size:18px;font-weight:600;margin:0">Memory</h1>
+
+  <div style="margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span class="badge badge-accent"  id="lvlBadge">Niveau 1</span>
+    <span class="badge badge-muted"   id="pairsBadge">0/8 paires</span>
+    <span class="badge badge-warning" id="timerBadge" style="display:none">⏱ --</span>
+    <span class="badge badge-muted"   id="movesBadge">0 coups</span>
+  </div>
+</div>
+
+<!-- Sélecteur de niveau -->
+<div id="levelSelector" style="max-width:700px;margin:0 auto 28px">
+  <div class="section-label">Choisir un niveau</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+    {% for n in range(1,16) %}
+    <button onclick="startGame({{ n }})"
+            id="lvlBtn{{ n }}"
+            class="btn btn-secondary"
+            style="flex-direction:column;gap:3px;padding:10px 6px;
+                   font-size:12px;height:auto">
+      <span style="font-size:16px;font-weight:700;
+                   color:{% if n<=3 %}var(--success)
+                         {% elif n<=6 %}var(--accent)
+                         {% elif n<=9 %}var(--warning)
+                         {% elif n<=12 %}var(--orange,#f97316)
+                         {% else %}var(--danger){% endif %}">
+        {{ n }}
+      </span>
+      <span style="font-size:10px;color:var(--text-muted)">
+        {% if n<=3 %}4×4{% elif n<=9 %}4×4{% elif n<=12 %}6×6{% else %}8×8{% endif %}
+      </span>
+    </button>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Zone de jeu -->
+<div id="gameArea" style="display:none;max-width:720px;margin:0 auto">
+
+  <!-- Progress barre paires -->
+  <div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;
+                font-size:11px;color:var(--text-muted);margin-bottom:4px">
+      <span id="progressLabel">Progression</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressBar" style="width:0%;transition:width 0.4s"></div>
+    </div>
+  </div>
+
+  <div id="board" style="display:grid;gap:8px;justify-content:center"></div>
+
+  <div style="display:flex;justify-content:center;gap:10px;margin-top:20px">
+    <button class="btn btn-secondary" onclick="startGame(currentLevel)">
+      <i data-lucide="refresh-cw"></i> Recommencer
+    </button>
+    <button class="btn btn-ghost" onclick="showLevelSelector()">
+      <i data-lucide="list"></i> Niveaux
+    </button>
+  </div>
+</div>
+
+<!-- Win / Lose banner -->
+<div id="resultBanner" style="display:none;max-width:400px;margin:20px auto;text-align:center">
+  <div class="card">
+    <div class="card-body" style="padding:32px">
+      <div id="resultEmoji" style="font-size:48px;margin-bottom:12px"></div>
+      <div id="resultTitle"
+           style="font-size:20px;font-weight:700;color:var(--text-primary);
+                  margin-bottom:6px"></div>
+      <div id="resultSub"
+           style="font-size:13px;color:var(--text-secondary);margin-bottom:20px"></div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="startGame(currentLevel)">
+          <i data-lucide="refresh-cw"></i> Rejouer
+        </button>
+        <button class="btn btn-secondary" id="btnNextLevel" onclick="nextLevel()">
+          Niveau suivant <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Carte mémoire ─────────────────────────────────────────── */
+.mem-card {
+  width: 100%;
+  aspect-ratio: 1;
+  cursor: pointer;
+  perspective: 600px;
+}
+.mem-card-inner {
+  width:100%;height:100%;
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform 0.5s cubic-bezier(.4,0,.2,1);
+  border-radius:var(--radius-sm);
+}
+.mem-card.flipped .mem-card-inner  { transform:rotateY(180deg); }
+.mem-card.matched .mem-card-inner  {
+  transform:rotateY(180deg);
+  pointer-events:none;
+}
+.mem-card-face {
+  position:absolute;inset:0;
+  backface-visibility:hidden;
+  border-radius:inherit;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-light);
+}
+.mem-card-back {
+  background:var(--bg-elevated);
+  color:var(--text-muted);
+  font-size:20px;
+}
+.mem-card-front {
+  background:var(--bg-surface);
+  transform:rotateY(180deg);
+  font-size:clamp(18px,3vw,32px);
+}
+.mem-card.matched .mem-card-front {
+  background:var(--success-dim);
+  border-color:rgba(16,185,129,0.4);
+}
+.mem-card.wrong .mem-card-inner {
+  animation:shake 0.4s ease;
+}
+@keyframes shake {
+  0%,100%{transform:rotateY(180deg) translateX(0)}
+  25%{transform:rotateY(180deg) translateX(-5px)}
+  75%{transform:rotateY(180deg) translateX(5px)}
+}
+</style>
+
+<script>
+// ── Configuration des 15 niveaux ─────────────────────────────────────────────
+const LEVELS = [
+  /* 1 */ { grid:4, pairs:8,  flipTime:1200, timer:0,   label:'4×4 · Débutant'    },
+  /* 2 */ { grid:4, pairs:8,  flipTime:1000, timer:0,   label:'4×4 · Débutant+'   },
+  /* 3 */ { grid:4, pairs:8,  flipTime:800,  timer:0,   label:'4×4 · Facile'      },
+  /* 4 */ { grid:4, pairs:8,  flipTime:800,  timer:120, label:'4×4 · Facile timer'},
+  /* 5 */ { grid:4, pairs:8,  flipTime:600,  timer:90,  label:'4×4 · Moyen'       },
+  /* 6 */ { grid:4, pairs:8,  flipTime:500,  timer:75,  label:'4×4 · Moyen+'      },
+  /* 7 */ { grid:6, pairs:18, flipTime:700,  timer:0,   label:'6×6 · Intermédiaire'},
+  /* 8 */ { grid:6, pairs:18, flipTime:600,  timer:180, label:'6×6 · Inter. timer' },
+  /* 9 */ { grid:6, pairs:18, flipTime:500,  timer:140, label:'6×6 · Inter.+'     },
+  /*10 */ { grid:6, pairs:18, flipTime:400,  timer:120, label:'6×6 · Difficile'   },
+  /*11 */ { grid:6, pairs:18, flipTime:350,  timer:90,  label:'6×6 · Difficile+'  },
+  /*12 */ { grid:6, pairs:18, flipTime:300,  timer:75,  label:'6×6 · Expert'      },
+  /*13 */ { grid:8, pairs:32, flipTime:400,  timer:180, label:'8×8 · Master'      },
+  /*14 */ { grid:8, pairs:32, flipTime:300,  timer:140, label:'8×8 · Master+'     },
+  /*15 */ { grid:8, pairs:32, flipTime:250,  timer:100, label:'8×8 · Légendaire'  },
+];
+
+// ── Pool de 100 symboles (unicode, pas d'emoji répétés) ──────────────────────
+const SYMBOL_POOL = [
+  '🐳','⚙️','🔧','📦','🚀','🔒','📊','🌐','💡','🎯',
+  '🔑','🧩','⚡','🌿','🏆','🎪','🔮','🎭','🌊','🦋',
+  '🎸','🎨','🎬','🎯','🎲','🃏','🎰','🎱','🏓','🎳',
+  '🦊','🐺','🦁','🐯','🦅','🦉','🦚','🦜','🐬','🦈',
+  '🌸','🌺','🌻','🌹','🍀','🌴','🌵','🍁','🌾','🎋',
+  '🍎','🍊','🍋','🍇','🍓','🥑','🍕','🍔','🌮','🍜',
+  '⛰️','🌋','🏔️','🗻','🏝️','🌅','🌄','🌠','🌌','🌈',
+  '💎','🔴','🟡','🟢','🔵','🟣','🟤','⬛','⬜','🔶',
+  '🎵','🎶','🎸','🎹','🎺','🎻','🥁','🎷','🪗','🎤',
+  '🚗','✈️','🚂','🚢','🚁','🛸','🚀','🛺','🚲','⛵',
+];
+
+// ── État global ───────────────────────────────────────────────────────────────
+let currentLevel = 1;
+let flippedCards = [];
+let matchedCount = 0;
+let totalMoves   = 0;
+let lockBoard    = false;
+let timerInterval = null;
+let timeLeft     = 0;
+let gameSymbols  = [];
+
+// ── Fisher-Yates shuffle ──────────────────────────────────────────────────────
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Démarrer une partie ───────────────────────────────────────────────────────
+function startGame(level) {
+  currentLevel = level;
+  const cfg    = LEVELS[level - 1];
+
+  // UI
+  document.getElementById('levelSelector').style.display = 'none';
+  document.getElementById('gameArea').style.display      = 'block';
+  document.getElementById('resultBanner').style.display  = 'none';
+  document.getElementById('lvlBadge').textContent        = `Niveau ${level}`;
+  document.getElementById('pairsBadge').textContent      = `0/${cfg.pairs} paires`;
+  document.getElementById('movesBadge').textContent      = '0 coups';
+  document.getElementById('progressBar').style.width     = '0%';
+  document.getElementById('progressPct').textContent     = '0%';
+
+  // Reset état
+  flippedCards = []; matchedCount = 0; totalMoves = 0; lockBoard = false;
+  clearInterval(timerInterval);
+
+  // Timer
+  const timerEl = document.getElementById('timerBadge');
+  if (cfg.timer > 0) {
+    timeLeft = cfg.timer;
+    timerEl.style.display = 'inline-flex';
+    timerEl.textContent   = `⏱ ${timeLeft}s`;
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = `⏱ ${timeLeft}s`;
+      timerEl.style.background = timeLeft <= 10
+        ? 'var(--danger-dim)' : 'var(--bg-elevated)';
+      timerEl.style.color = timeLeft <= 10
+        ? 'var(--danger)' : 'var(--text-secondary)';
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        showResult(false, `Temps écoulé ! ${matchedCount}/${cfg.pairs} paires trouvées.`);
+      }
+    }, 1000);
+  } else {
+    timerEl.style.display = 'none';
+  }
+
+  // Générer symboles : sélectionner cfg.pairs depuis le pool aléatoirement
+  const pool    = shuffle(SYMBOL_POOL).slice(0, cfg.pairs);
+  gameSymbols   = shuffle([...pool, ...pool]); // paires mélangées
+
+  // Construire la grille
+  const board   = document.getElementById('board');
+  const cellSz  = cfg.grid === 8 ? 70 : cfg.grid === 6 ? 88 : 110;
+  board.style.gridTemplateColumns = `repeat(${cfg.grid}, ${cellSz}px)`;
+  board.innerHTML = '';
+
+  gameSymbols.forEach((sym, i) => {
+    const card = document.createElement('div');
+    card.className    = 'mem-card';
+    card.dataset.sym  = sym;
+    card.dataset.idx  = i;
+    card.style.width  = `${cellSz}px`;
+    card.innerHTML    = `
+      <div class="mem-card-inner">
+        <div class="mem-card-face mem-card-back">
+          <i data-lucide="help-circle"
+             style="width:24px;height:24px;stroke-width:1.5"></i>
+        </div>
+        <div class="mem-card-face mem-card-front">${sym}</div>
+      </div>`;
+    card.addEventListener('click', () => onCardClick(card, cfg));
+    board.appendChild(card);
+  });
+
+  lucide.createIcons();
+}
+
+// ── Clic sur une carte ────────────────────────────────────────────────────────
+function onCardClick(card, cfg) {
+  if (lockBoard) return;
+  if (card.classList.contains('flipped')) return;
+  if (card.classList.contains('matched')) return;
+
+  card.classList.add('flipped');
+  flippedCards.push(card);
+
+  if (flippedCards.length === 2) {
+    lockBoard = true;
+    totalMoves++;
+    document.getElementById('movesBadge').textContent = `${totalMoves} coups`;
+
+    const [a, b] = flippedCards;
+
+    if (a.dataset.sym === b.dataset.sym) {
+      // Match !
+      a.classList.add('matched');
+      b.classList.add('matched');
+      matchedCount++;
+
+      const pct = Math.round((matchedCount / cfg.pairs) * 100);
+      document.getElementById('pairsBadge').textContent   = `${matchedCount}/${cfg.pairs} paires`;
+      document.getElementById('progressBar').style.width  = `${pct}%`;
+      document.getElementById('progressPct').textContent  = `${pct}%`;
+
+      flippedCards = [];
+      lockBoard    = false;
+
+      if (matchedCount === cfg.pairs) {
+        clearInterval(timerInterval);
+        const bonus = cfg.timer > 0 ? ` (${timeLeft}s restantes)` : '';
+        showResult(true,
+          `Bravo ! ${totalMoves} coups${bonus}.`,
+          currentLevel < 15
+        );
+      }
+    } else {
+      // Pas de match
+      a.classList.add('wrong');
+      b.classList.add('wrong');
+      setTimeout(() => {
+        a.classList.remove('flipped', 'wrong');
+        b.classList.remove('flipped', 'wrong');
+        flippedCards = [];
+        lockBoard    = false;
+      }, cfg.flipTime);
+    }
+  }
+}
+
+// ── Résultat ──────────────────────────────────────────────────────────────────
+function showResult(win, msg, hasNext = false) {
+  document.getElementById('gameArea').style.display     = 'none';
+  document.getElementById('resultBanner').style.display = 'block';
+  document.getElementById('resultEmoji').textContent    = win ? '🏆' : '😞';
+  document.getElementById('resultTitle').textContent    = win ? 'Victoire !' : 'Perdu !';
+  document.getElementById('resultSub').textContent      = msg;
+  document.getElementById('btnNextLevel').style.display =
+    win && hasNext ? 'inline-flex' : 'none';
+  lucide.createIcons();
+}
+
+function nextLevel() { startGame(currentLevel + 1); }
+function showLevelSelector() {
+  document.getElementById('gameArea').style.display      = 'none';
+  document.getElementById('resultBanner').style.display  = 'none';
+  document.getElementById('levelSelector').style.display = 'block';
+}
+</script>
+{% endblock %}

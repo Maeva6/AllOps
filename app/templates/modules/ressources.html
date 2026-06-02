@@ -1,204 +1,256 @@
 {% extends "base.html" %}
+{% block breadcrumb %}Ressources — {{ cert.nom }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{{ url_for('tracker.index') }}" class="btn btn-outline-secondary">
-    ← Retour
+
+<div class="flex items-center gap-3 mb-4">
+  <a href="{{ url_for('tracker.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i>
+    Retour
   </a>
   <div>
-    <h2 class="mb-0">📚 Ressources</h2>
-    <small class="text-muted">{{ cert.nom }} — {{ cert.organisme }}</small>
+    <h1 style="font-size:18px;font-weight:600;margin:0">
+      Ressources
+    </h1>
+    <p style="font-size:12px;color:var(--text-muted);margin:0">
+      {{ cert.nom }} · {{ cert.organisme }}
+    </p>
   </div>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<div class="row g-4">
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;
+            align-items:start">
 
   <!-- ── Mes ressources ──────────────────────────────────────────────────── -->
-  <div class="col-md-7">
-    <div class="card shadow-sm">
-      <div class="card-header bg-primary text-white d-flex
-                  justify-content-between align-items-center">
-        <h5 class="mb-0">📌 Mes ressources</h5>
-        <span class="badge bg-light text-primary">
-          {{ cert.ressources|length }}
-        </span>
-      </div>
-      <div class="card-body p-0">
-        {% if cert.ressources %}
-          {% for r in cert.ressources %}
-          <div class="d-flex align-items-center gap-3 p-3
-                      border-bottom hover-bg">
+  <div>
+    <div class="section-label">Mes ressources ({{ cert.ressources|length }})</div>
+
+    {% if cert.ressources %}
+      {% for r in cert.ressources %}
+      <div class="card mb-2" style="transition:border-color 0.15s">
+        <div class="card-body" style="padding:14px 18px">
+          <div class="flex items-center gap-3">
             <!-- Icône type -->
-            <div class="fs-4">
-              {% if r.type_ressource == 'video' %}🎬
-              {% elif r.type_ressource == 'cours' %}📖
-              {% elif r.type_ressource == 'pratique' %}⚙️
-              {% elif r.type_ressource == 'livre' %}📚
-              {% else %}📄{% endif %}
+            <div style="
+              width:36px;height:36px;border-radius:var(--radius-sm);
+              display:flex;align-items:center;justify-content:center;
+              flex-shrink:0;
+              background:
+              {% if r.type_ressource=='video' %}var(--danger-dim)
+              {% elif r.type_ressource=='cours' %}var(--accent-glow)
+              {% elif r.type_ressource=='pratique' %}var(--success-dim)
+              {% elif r.type_ressource=='livre' %}var(--warning-dim)
+              {% else %}var(--bg-elevated){% endif %}">
+              {% if r.type_ressource=='video' %}
+                <i data-lucide="play-circle"
+                   style="width:16px;height:16px;color:var(--danger)"></i>
+              {% elif r.type_ressource=='cours' %}
+                <i data-lucide="book-open"
+                   style="width:16px;height:16px;color:var(--accent)"></i>
+              {% elif r.type_ressource=='pratique' %}
+                <i data-lucide="terminal"
+                   style="width:16px;height:16px;color:var(--success)"></i>
+              {% elif r.type_ressource=='livre' %}
+                <i data-lucide="book"
+                   style="width:16px;height:16px;color:var(--warning)"></i>
+              {% else %}
+                <i data-lucide="file-text"
+                   style="width:16px;height:16px;color:var(--text-secondary)"></i>
+              {% endif %}
             </div>
 
-            <div class="flex-grow-1">
+            <div style="flex:1;min-width:0">
               <a href="{{ r.url }}" target="_blank"
-                 class="text-decoration-none fw-bold">
+                 style="font-weight:600;font-size:13.5px;
+                        color:var(--text-primary);text-decoration:none;
+                        display:block;white-space:nowrap;overflow:hidden;
+                        text-overflow:ellipsis">
                 {{ r.titre }}
               </a>
-              <div class="small text-muted mt-1">
+              <div class="flex items-center gap-2 mt-1">
                 <span class="badge
-                  {% if r.type_ressource == 'video' %}bg-danger
-                  {% elif r.type_ressource == 'cours' %}bg-primary
-                  {% elif r.type_ressource == 'pratique' %}bg-success
-                  {% elif r.type_ressource == 'livre' %}bg-warning text-dark
-                  {% else %}bg-secondary{% endif %}">
+                  {% if r.type_ressource=='video' %}badge-danger
+                  {% elif r.type_ressource=='cours' %}badge-accent
+                  {% elif r.type_ressource=='pratique' %}badge-success
+                  {% else %}badge-muted{% endif %}">
                   {{ r.type_ressource }}
                 </span>
                 {% if r.gratuit %}
-                  <span class="badge bg-info text-dark ms-1">GRATUIT</span>
+                  <span class="badge badge-free">Gratuit</span>
                 {% else %}
-                  <span class="badge bg-warning text-dark ms-1">PAYANT</span>
+                  <span class="badge badge-paid">Payant</span>
                 {% endif %}
-                <span class="ms-2">{{ r.url[:50] }}...</span>
+                <span class="text-xs mono text-muted"
+                      style="overflow:hidden;text-overflow:ellipsis;
+                             white-space:nowrap;max-width:200px">
+                  {{ r.url }}
+                </span>
               </div>
             </div>
 
-            <div class="d-flex gap-2">
+            <div class="flex gap-2">
               <a href="{{ r.url }}" target="_blank"
-                 class="btn btn-sm btn-outline-primary">
-                🔗 Ouvrir
+                 class="btn btn-secondary btn-sm">
+                <i data-lucide="external-link"></i>
               </a>
               <form action="{{ url_for('tracker.supprimer_ressource',
                              rid=r.id) }}" method="POST">
-                <button class="btn btn-sm btn-outline-danger"
-                  onclick="return confirm('Supprimer cette ressource ?')">
-                  🗑️
+                <button class="btn btn-danger btn-sm"
+                  onclick="return confirm('Supprimer ?')">
+                  <i data-lucide="trash-2"></i>
                 </button>
               </form>
             </div>
           </div>
-          {% endfor %}
-        {% else %}
-          <div class="text-center py-4 text-muted">
-            <div style="font-size:2rem">📭</div>
-            <p class="mt-2">Aucune ressource ajoutée</p>
-          </div>
-        {% endif %}
+        </div>
       </div>
-    </div>
+      {% endfor %}
+    {% else %}
+      <div class="card" style="padding:32px;text-align:center">
+        <i data-lucide="inbox"
+           style="width:36px;height:36px;color:var(--text-muted);
+                  margin:0 auto 12px;display:block;stroke-width:1.5"></i>
+        <p class="text-secondary text-sm">Aucune ressource ajoutée</p>
+      </div>
+    {% endif %}
 
     <!-- Ajouter manuellement -->
-    <div class="card shadow-sm mt-3">
-      <div class="card-header bg-dark text-white">
-        <h6 class="mb-0">➕ Ajouter une ressource manuellement</h6>
+    <div class="card mt-3">
+      <div class="card-header">
+        <i data-lucide="plus" class="header-icon"></i>
+        Ajouter manuellement
       </div>
       <div class="card-body">
         <form action="{{ url_for('tracker.ajouter_ressource',
                        id=cert.id) }}" method="POST">
-          <div class="row g-2">
-            <div class="col-12">
-              <input type="text" name="titre" class="form-control"
-                     placeholder="Titre de la ressource" required>
-            </div>
-            <div class="col-12">
-              <input type="url" name="url" class="form-control"
-                     placeholder="https://..." required>
-            </div>
-            <div class="col-md-6">
-              <select name="type_ressource" class="form-select">
-                <option value="cours">📖 Cours</option>
-                <option value="video">🎬 Vidéo</option>
-                <option value="pratique">⚙️ Pratique / Lab</option>
-                <option value="doc">📄 Documentation</option>
-                <option value="livre">📚 Livre</option>
+          <div class="form-group">
+            <label class="form-label">Titre</label>
+            <input type="text" name="titre" class="form-control"
+                   placeholder="Nom de la ressource" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL</label>
+            <input type="url" name="url" class="form-control"
+                   placeholder="https://..." required>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group">
+              <label class="form-label">Type</label>
+              <select name="type_ressource" class="form-control">
+                <option value="cours">Cours</option>
+                <option value="video">Vidéo</option>
+                <option value="pratique">Pratique / Lab</option>
+                <option value="doc">Documentation</option>
+                <option value="livre">Livre</option>
               </select>
             </div>
-            <div class="col-md-6 d-flex align-items-center">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox"
-                       name="gratuit" checked>
-                <label class="form-check-label">Gratuit</label>
-              </div>
-            </div>
-            <div class="col-12">
-              <button type="submit" class="btn btn-dark w-100">
-                ➕ Ajouter
-              </button>
+            <div class="form-group"
+                 style="display:flex;align-items:flex-end;padding-bottom:2px">
+              <label class="form-switch">
+                <input type="checkbox" name="gratuit" checked>
+                <span class="form-switch-label">Gratuit</span>
+              </label>
             </div>
           </div>
+          <button type="submit" class="btn btn-primary w-full">
+            <i data-lucide="plus"></i>
+            Ajouter
+          </button>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- ── Suggestions automatiques ────────────────────────────────────────── -->
-  <div class="col-md-5">
-    <div class="card shadow-sm border-warning">
-      <div class="card-header bg-warning text-dark">
-        <h5 class="mb-0">💡 Suggestions pour toi</h5>
-        <small>Basées sur "{{ cert.nom }}"</small>
-      </div>
-      <div class="card-body p-0">
-        {% if suggestions %}
-          {% for s in suggestions %}
-          <div class="p-3 border-bottom">
-            <div class="d-flex align-items-start gap-2">
-              <div class="fs-5">
-                {% if s.type == 'video' %}🎬
-                {% elif s.type == 'cours' %}📖
-                {% elif s.type == 'pratique' %}⚙️
-                {% elif s.type == 'livre' %}📚
-                {% else %}📄{% endif %}
-              </div>
-              <div class="flex-grow-1">
-                <div class="fw-bold small">{{ s.titre }}</div>
-                <div class="mt-1">
-                  <span class="badge bg-secondary">{{ s.type }}</span>
-                  {% if s.gratuit %}
-                    <span class="badge bg-info text-dark">GRATUIT</span>
-                  {% else %}
-                    <span class="badge bg-warning text-dark">PAYANT</span>
-                  {% endif %}
-                </div>
-              </div>
+  <!-- ── Suggestions ─────────────────────────────────────────────────────── -->
+  <div>
+    <div class="section-label">
+      Suggestions ({{ suggestions|length }})
+    </div>
+
+    {% if suggestions %}
+      {% for s in suggestions %}
+      <div class="card mb-2">
+        <div class="card-body" style="padding:14px 16px">
+          <div class="flex items-start gap-3">
+            <div style="
+              width:32px;height:32px;border-radius:var(--radius-sm);
+              display:flex;align-items:center;justify-content:center;
+              flex-shrink:0;
+              background:
+              {% if s.type=='video' %}var(--danger-dim)
+              {% elif s.type=='cours' %}var(--accent-glow)
+              {% elif s.type=='pratique' %}var(--success-dim)
+              {% else %}var(--bg-elevated){% endif %}">
+              {% if s.type=='video' %}
+                <i data-lucide="play-circle"
+                   style="width:14px;height:14px;color:var(--danger)"></i>
+              {% elif s.type=='cours' %}
+                <i data-lucide="book-open"
+                   style="width:14px;height:14px;color:var(--accent)"></i>
+              {% elif s.type=='pratique' %}
+                <i data-lucide="terminal"
+                   style="width:14px;height:14px;color:var(--success)"></i>
+              {% else %}
+                <i data-lucide="file-text"
+                   style="width:14px;height:14px;color:var(--text-secondary)"></i>
+              {% endif %}
             </div>
 
-            <div class="d-flex gap-2 mt-2">
-              <a href="{{ s.url }}" target="_blank"
-                 class="btn btn-sm btn-outline-secondary flex-grow-1">
-                🔗 Voir
-              </a>
-              <!-- Importer en un clic -->
-              <form action="{{ url_for('tracker.importer_suggestion',
-                             id=cert.id) }}" method="POST">
-                <input type="hidden" name="titre"          value="{{ s.titre }}">
-                <input type="hidden" name="url"            value="{{ s.url }}">
-                <input type="hidden" name="type_ressource" value="{{ s.type }}">
-                <input type="hidden" name="gratuit"
-                       value="{{ 'true' if s.gratuit else 'false' }}">
-                <button type="submit" class="btn btn-sm btn-warning">
-                  ➕ Ajouter
-                </button>
-              </form>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;
+                          color:var(--text-primary);margin-bottom:4px;
+                          white-space:nowrap;overflow:hidden;
+                          text-overflow:ellipsis">
+                {{ s.titre }}
+              </div>
+              <div class="flex gap-2">
+                <span class="badge badge-muted">{{ s.type }}</span>
+                {% if s.gratuit %}
+                  <span class="badge badge-free">Gratuit</span>
+                {% else %}
+                  <span class="badge badge-paid">Payant</span>
+                {% endif %}
+              </div>
             </div>
           </div>
-          {% endfor %}
-        {% else %}
-          <div class="text-center py-4 text-muted">
-            <p>✅ Toutes les suggestions ont été ajoutées</p>
+
+          <div class="flex gap-2 mt-3">
+            <a href="{{ s.url }}" target="_blank"
+               class="btn btn-secondary btn-sm" style="flex:1">
+              <i data-lucide="external-link"></i>
+              Voir
+            </a>
+            <form action="{{ url_for('tracker.importer_suggestion',
+                           id=cert.id) }}" method="POST" style="flex:1">
+              <input type="hidden" name="titre"          value="{{ s.titre }}">
+              <input type="hidden" name="url"            value="{{ s.url }}">
+              <input type="hidden" name="type_ressource" value="{{ s.type }}">
+              <input type="hidden" name="gratuit"
+                     value="{{ 'true' if s.gratuit else 'false' }}">
+              <button type="submit" class="btn btn-accent btn-sm w-full"
+                      style="background:var(--accent-glow);
+                             color:var(--accent);
+                             border-color:var(--accent-dim)">
+                <i data-lucide="plus"></i>
+                Ajouter
+              </button>
+            </form>
           </div>
-        {% endif %}
+        </div>
       </div>
-    </div>
+      {% endfor %}
+    {% else %}
+      <div class="card" style="padding:24px;text-align:center">
+        <i data-lucide="check-circle"
+           style="width:28px;height:28px;color:var(--success);
+                  margin:0 auto 8px;display:block"></i>
+        <p class="text-secondary text-sm">
+          Toutes les suggestions ont été ajoutées
+        </p>
+      </div>
+    {% endif %}
   </div>
 
 </div>
+
 {% endblock %}

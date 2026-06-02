@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Questions de cours{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 300px;
+            gap:20px;height:calc(100vh - 120px);align-items:start">
+
+  <!-- ── Zone principale ─────────────────────────────────────────── -->
+  <div style="display:flex;flex-direction:column;height:100%">
+
+    <!-- En-tête -->
+    <div class="flex items-center gap-3 mb-3">
+      <div style="
+        width:40px;height:40px;border-radius:var(--radius-sm);
+        background:linear-gradient(135deg,var(--accent),var(--accent-hover));
+        display:flex;align-items:center;justify-content:center;
+        flex-shrink:0">
+        <i data-lucide="message-circle"
+           style="width:20px;height:20px;color:white"></i>
+      </div>
+      <div>
+        <h1 style="font-size:16px;font-weight:700;margin:0;
+                   color:var(--text-primary)">
+          Questions de cours
+        </h1>
+        <p style="font-size:12px;color:var(--text-muted);margin:0">
+          Pose une question — obtiens une réponse claire et pédagogique
+        </p>
+      </div>
+    </div>
+
+    <!-- Fenêtre des messages -->
+    <div id="chatWindow" style="
+      flex:1;
+      overflow-y:auto;
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:var(--bg-base);
+      padding:20px;
+      min-height:300px;
+      max-height:calc(100vh - 320px);
+      scroll-behavior:smooth">
+
+      <!-- Message de bienvenue -->
+      <div id="welcomeMsg" style="
+        text-align:center;padding:40px 20px;
+        color:var(--text-muted)">
+        <i data-lucide="graduation-cap"
+           style="width:40px;height:40px;margin:0 auto 12px;
+                  display:block;stroke-width:1.5;
+                  color:var(--accent)"></i>
+        <div style="font-size:15px;font-weight:500;
+                    color:var(--text-secondary);margin-bottom:8px">
+          Pose ta question de cours
+        </div>
+        <div style="font-size:12.5px;color:var(--text-muted);
+                    max-width:320px;margin:0 auto;line-height:1.6">
+          Définitions, exemples, comparaisons, schémas — 
+          choisis le mode qui correspond à ta question.
+        </div>
+
+        <!-- Suggestions rapides -->
+        <div style="margin-top:24px;display:flex;flex-wrap:wrap;
+                    gap:8px;justify-content:center">
+          {% for suggestion in [
+            'Différence entre une vue et une table SQL',
+            'Qu\'est-ce qu\'un algorithme glouton ?',
+            'Expliquer le principe ACID',
+            'Différence entre BFS et DFS',
+            'C\'est quoi une clé étrangère ?',
+            'Expliquer la récursivité avec un exemple',
+          ] %}
+          <button class="chip-suggestion"
+                  onclick="setQuestion({{ suggestion | tojson }})">
+            {{ suggestion }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Messages dynamiques -->
+      <div id="messages"></div>
+    </div>
+
+    <!-- Barre de saisie -->
+    <div style="margin-top:12px">
+
+      <!-- Options de mode + matière -->
+      <div style="
+        display:flex;gap:8px;align-items:center;
+        margin-bottom:10px;flex-wrap:wrap">
+
+        <select id="selectMode" class="form-control"
+                style="width:auto;font-size:12px;padding:6px 10px">
+          {% for key, label in modes.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        <input type="text" id="inputMatiere"
+               class="form-control"
+               style="width:160px;font-size:12px;padding:6px 10px"
+               placeholder="Matière (optionnel)">
+
+        <button class="btn btn-ghost btn-sm"
+                onclick="viderHistoriqueLocal()"
+                title="Effacer la conversation">
+          <i data-lucide="trash-2"
+             style="width:14px;height:14px"></i>
+        </button>
+      </div>
+
+      <!-- Zone de saisie -->
+      <div style="
+        display:flex;gap:10px;align-items:flex-end;
+        background:var(--bg-elevated);
+        border:1px solid var(--border);
+        border-radius:var(--radius);
+        padding:10px 14px;
+        transition:border-color 0.2s"
+           id="inputWrapper">
+        <textarea id="inputQuestion"
+                  placeholder="Ex: Quelle est la différence entre un processus et un thread ?"
+                  style="
+                    flex:1;border:none;background:transparent;
+                    resize:none;outline:none;font-family:inherit;
+                    font-size:14px;color:var(--text-primary);
+                    min-height:20px;max-height:120px;
+                    line-height:1.5;overflow:hidden"
+                  rows="1"
+                  onkeydown="handleKeyDown(event)"
+                  oninput="autoResize(this)"
+        ></textarea>
+        <button id="btnEnvoyer"
+                onclick="envoyerQuestion()"
+                style="
+                  width:36px;height:36px;border-radius:50%;
+                  background:var(--accent);border:none;
+                  cursor:pointer;display:flex;
+                  align-items:center;justify-content:center;
+                  flex-shrink:0;transition:all 0.2s;
+                  opacity:0.5"
+                disabled>
+          <i data-lucide="send"
+             style="width:16px;height:16px;color:white;
+                    margin-left:2px"></i>
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);
+                  margin-top:6px;text-align:right">
+        Entrée pour envoyer · Maj+Entrée pour nouvelle ligne
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Historique latéral ────────────────────────────────────────── -->
+  <div style="
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:var(--bg-elevated);
+    overflow:hidden;
+    max-height:calc(100vh - 120px)">
+
+    <div style="
+      padding:12px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:12.5px;font-weight:600;
+                  color:var(--text-primary)">
+        <i data-lucide="history"
+           style="width:13px;height:13px;vertical-align:middle;
+                  margin-right:5px"></i>
+        Historique
+      </div>
+      {% if historique %}
+      <button class="btn btn-ghost btn-sm"
+              style="font-size:11px;padding:3px 8px"
+              onclick="viderTout()">
+        Vider
+      </button>
+      {% endif %}
+    </div>
+
+    <div style="
+      overflow-y:auto;
+      max-height:calc(100vh - 200px)" id="historiqueList">
+
+      {% if historique %}
+        {% for qa in historique %}
+        <div class="qa-history-item"
+             id="hist-{{ qa.id }}"
+             onclick="chargerQA({{ qa.id }}, {{ qa.question | tojson }}, {{ qa.reponse | tojson }})"
+             style="
+               padding:10px 14px;
+               border-bottom:1px solid var(--border);
+               cursor:pointer;transition:background 0.1s">
+          <div style="
+            font-size:12px;font-weight:500;
+            color:var(--text-primary);
+            white-space:nowrap;overflow:hidden;
+            text-overflow:ellipsis;margin-bottom:3px">
+            {{ qa.question[:55] }}{% if qa.question|length > 55 %}…{% endif %}
+          </div>
+          <div style="
+            display:flex;align-items:center;
+            justify-content:space-between;gap:6px">
+            <span style="
+              font-size:10px;
+              background:var(--accent-glow);
+              color:var(--accent);padding:1px 6px;
+              border-radius:10px">
+              {{ qa.mode }}
+            </span>
+            <span style="font-size:10px;color:var(--text-muted)">
+              {{ qa.created_at.strftime('%d/%m %H:%M') }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="
+          padding:32px 16px;text-align:center;
+          color:var(--text-muted);font-size:12.5px">
+          Aucune question posée
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Chips suggestions ─────────────────────────────────────────── */
+.chip-suggestion {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.chip-suggestion:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Messages ──────────────────────────────────────────────────── */
+.msg-question {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.msg-question-bubble {
+  max-width: 72%;
+  background: var(--accent);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 18px 18px 4px 18px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.msg-reponse {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: flex-start;
+}
+.msg-reponse-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.msg-reponse-content {
+  flex: 1;
+  min-width: 0;
+}
+.msg-reponse-bubble {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  border-radius: 4px 18px 18px 18px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+/* Markdown rendu dans les réponses */
+.msg-reponse-bubble strong  { font-weight: 600; }
+.msg-reponse-bubble em      { font-style: italic; }
+.msg-reponse-bubble code    {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+.msg-reponse-bubble pre {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.msg-reponse-bubble pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.msg-reponse-bubble ul,
+.msg-reponse-bubble ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.msg-reponse-bubble li { margin: 3px 0; }
+
+/* Typing indicator */
+.typing-dot {
+  width: 7px; height: 7px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  animation: bounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%           { transform: translateY(-6px); }
+}
+
+/* Historique */
+.qa-history-item:hover { background: var(--bg-hover); }
+
+/* Meta réponse */
+.msg-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg-question, .msg-reponse {
+  animation: fadeSlideIn 0.2s ease-out;
+}
+</style>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let isLoading = false;
+
+// ── Marked.js pour le rendu Markdown ─────────────────────────────────────────
+// Chargement dynamique
+(function loadMarked() {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js';
+  s.onload = () => {
+    marked.setOptions({
+      breaks:   true,
+      gfm:      true,
+      sanitize: false,
+    });
+  };
+  document.head.appendChild(s);
+})();
+
+function renderMarkdown(text) {
+  if (typeof marked !== 'undefined') {
+    return marked.parse(text);
+  }
+  // Fallback: rendu minimal si marked pas chargé
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+    .replace(/`([^`]+)`/g,     '<code>$1</code>')
+    .replace(/\n/g,            '<br>');
+}
+
+// ── Textarea auto-resize ──────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  // Activer/désactiver le bouton
+  const btn = document.getElementById('btnEnvoyer');
+  const empty = !el.value.trim();
+  btn.disabled = empty || isLoading;
+  btn.style.opacity = (empty || isLoading) ? '0.5' : '1';
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    envoyerQuestion();
+  }
+}
+
+function setQuestion(text) {
+  const inp = document.getElementById('inputQuestion');
+  inp.value = text;
+  autoResize(inp);
+  inp.focus();
+}
+
+// ── Ajouter un message question ───────────────────────────────────────────────
+function addMessageQuestion(text) {
+  const welcome = document.getElementById('welcomeMsg');
+  if (welcome) welcome.style.display = 'none';
+
+  const div = document.createElement('div');
+  div.className = 'msg-question';
+  div.innerHTML = `
+    <div class="msg-question-bubble">${escapeHtml(text)}</div>
+  `;
+  document.getElementById('messages').appendChild(div);
+  scrollBottom();
+}
+
+// ── Ajouter typing indicator ──────────────────────────────────────────────────
+function addTypingIndicator() {
+  const div = document.createElement('div');
+  div.className = 'msg-reponse';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="msg-reponse-avatar">
+      <i data-lucide="bot" style="width:14px;height:14px;color:white"></i>
+    </div>
+    <div class="msg-reponse-content">
+      <div class="msg-reponse-bubble"
+           style="display:flex;gap:5px;align-items:center;padding:14px 16px">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('messages').appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  scrollBottom();
+}
+
+// ── Remplacer le typing par la réponse ────────────────────────────────────────
+function replaceTypingWithResponse(text, mode, id) {
+  const typing = document.getElementById('typingIndicator');
+  if (typing) typing.remove();
+
+  const modeLabels = {
+    'direct':  'Réponse directe',
+    'exemple': 'Avec exemples',
+    'compare': 'Comparaison',
+    'resume':  'Résumé',
+    'schema':  'Avec schéma',
+  };
+
+  const div = document.createElement('div');
+  div.className = 'msg-reponse';
+  div.id = `reponse-${id}`;
+  div.innerHTML = `
+    <div class="msg-reponse-avatar">
+      <i data-lucide="bot" style="width:14px;height:14px;color:white"></i>
+    </div>
+    <div class="msg-reponse-content">
+      <div class="msg-reponse-bubble">${renderMarkdown(text)}</div>
+      <div class="msg-meta">
+        <span style="background:var(--accent-glow);color:var(--accent);
+                     padding:1px 8px;border-radius:10px;font-size:10px">
+          ${modeLabels[mode] || mode}
+        </span>
+        <button onclick="copierReponse(${id})"
+                style="background:none;border:none;cursor:pointer;
+                       color:var(--text-muted);font-size:11px;
+                       display:flex;align-items:center;gap:3px;
+                       padding:0;font-family:inherit">
+          <i data-lucide="copy"
+             style="width:11px;height:11px"></i> Copier
+        </button>
+        <button onclick="supprimerQA(${id})"
+                style="background:none;border:none;cursor:pointer;
+                       color:var(--text-muted);font-size:11px;
+                       display:flex;align-items:center;gap:3px;
+                       padding:0;font-family:inherit">
+          <i data-lucide="trash-2"
+             style="width:11px;height:11px"></i> Supprimer
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('messages').appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  scrollBottom();
+
+  // Ajouter dans l'historique latéral
+  ajouterHistorique(id, text.substring(0, 55));
+}
+
+// ── Envoyer la question ───────────────────────────────────────────────────────
+async function envoyerQuestion() {
+  if (isLoading) return;
+
+  const input    = document.getElementById('inputQuestion');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const mode    = document.getElementById('selectMode').value;
+  const matiere = document.getElementById('inputMatiere').value.trim();
+
+  // Reset UI
+  input.value = '';
+  autoResize(input);
+  isLoading = true;
+
+  const btn = document.getElementById('btnEnvoyer');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+
+  addMessageQuestion(question);
+  addTypingIndicator();
+
+  try {
+    const r = await fetch('/qa/poser', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ question, mode, matiere })
+    });
+
+    const data = await r.json();
+
+    if (data.ok) {
+      replaceTypingWithResponse(data.reponse, mode, data.id);
+    } else {
+      replaceTypingWithResponse(
+        `❌ Erreur : ${data.erreur || 'Réessaie dans quelques secondes.'}`,
+        mode, 0
+      );
+    }
+  } catch(e) {
+    replaceTypingWithResponse(
+      '❌ Erreur de connexion. Vérifie ta connexion et réessaie.',
+      mode, 0
+    );
+  }
+
+  isLoading = false;
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+// ── Charger une question de l'historique ──────────────────────────────────────
+function chargerQA(id, question, reponse) {
+  // Marquer l'item actif
+  document.querySelectorAll('.qa-history-item')
+    .forEach(el => el.style.background = '');
+  const item = document.getElementById(`hist-${id}`);
+  if (item) item.style.background = 'var(--accent-glow)';
+
+  // Afficher dans la fenêtre
+  const welcome = document.getElementById('welcomeMsg');
+  if (welcome) welcome.style.display = 'none';
+
+  // Vérifier si déjà affiché
+  if (document.getElementById(`reponse-${id}`)) {
+    document.getElementById(`reponse-${id}`)
+            .scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  addMessageQuestion(question);
+  replaceTypingWithResponse(reponse, 'direct', id);
+}
+
+// ── Copier réponse ────────────────────────────────────────────────────────────
+function copierReponse(id) {
+  const el = document.querySelector(`#reponse-${id} .msg-reponse-bubble`);
+  if (!el) return;
+  navigator.clipboard.writeText(el.innerText).then(() => {
+    // Flash feedback
+    const btns = document.querySelectorAll(`#reponse-${id} button`);
+    btns.forEach(b => { if (b.textContent.includes('Copier')) {
+      const orig = b.innerHTML;
+      b.innerHTML = '<i data-lucide="check" style="width:11px;height:11px"></i> Copié !';
+      b.style.color = 'var(--success)';
+      setTimeout(() => { b.innerHTML = orig; b.style.color = ''; lucide.createIcons(); }, 2000);
+    }});
+    lucide.createIcons();
+  });
+}
+
+// ── Supprimer une question ────────────────────────────────────────────────────
+async function supprimerQA(id) {
+  if (!id) return;
+  await fetch(`/qa/supprimer/${id}`, { method: 'POST' });
+  // Retirer de l'affichage
+  const el = document.getElementById(`reponse-${id}`);
+  if (el) el.remove();
+  const hist = document.getElementById(`hist-${id}`);
+  if (hist) hist.remove();
+}
+
+// ── Vider la conversation locale ─────────────────────────────────────────────
+function viderHistoriqueLocal() {
+  document.getElementById('messages').innerHTML = '';
+  const welcome = document.getElementById('welcomeMsg');
+  if (welcome) welcome.style.display = 'block';
+}
+
+// ── Vider tout l'historique ───────────────────────────────────────────────────
+async function viderTout() {
+  if (!confirm('Vider tout l\'historique ?')) return;
+  await fetch('/qa/vider', { method: 'POST' });
+  document.getElementById('historiqueList').innerHTML =
+    '<div style="padding:32px 16px;text-align:center;' +
+    'color:var(--text-muted);font-size:12.5px">Aucune question posée</div>';
+  viderHistoriqueLocal();
+}
+
+// ── Ajouter dans l'historique latéral ────────────────────────────────────────
+function ajouterHistorique(id, preview) {
+  const list = document.getElementById('historiqueList');
+  const empty = list.querySelector('[style*="Aucune"]');
+  if (empty) empty.remove();
+
+  const now = new Date().toLocaleTimeString('fr-FR',
+                { hour: '2-digit', minute: '2-digit' });
+  const mode = document.getElementById('selectMode').value;
+
+  const div = document.createElement('div');
+  div.className = 'qa-history-item';
+  div.id        = `hist-${id}`;
+  div.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--border);' +
+                      'cursor:pointer;transition:background 0.1s';
+  div.innerHTML = `
+    <div style="font-size:12px;font-weight:500;color:var(--text-primary);
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                margin-bottom:3px">
+      ${escapeHtml(preview)}${preview.length >= 55 ? '…' : ''}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+      <span style="font-size:10px;background:var(--accent-glow);
+                   color:var(--accent);padding:1px 6px;border-radius:10px">
+        ${mode}
+      </span>
+      <span style="font-size:10px;color:var(--text-muted)">
+        Aujourd'hui ${now}
+      </span>
+    </div>
+  `;
+  // Insérer au début
+  list.insertBefore(div, list.firstChild);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function scrollBottom() {
+  const win = document.getElementById('chatWindow');
+  win.scrollTop = win.scrollHeight;
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Focus initial ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('inputQuestion').focus();
+});
+</script>
+{% endblock %}

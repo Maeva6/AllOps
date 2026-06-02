@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Nouveau CER{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-4">
+  <a href="{{ url_for('cer.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+  <h1 style="font-size:18px;font-weight:600;margin:0">
+    Nouveau Cahier d'Étude et de Recherche
+  </h1>
+</div>
+
+<form action="{{ url_for('cer.nouveau') }}" method="POST"
+      enctype="multipart/form-data" id="formCER">
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;
+            align-items:start">
+
+  <!-- Colonne principale -->
+  <div>
+
+    <!-- Page de garde -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i data-lucide="file-text" class="header-icon"></i>
+        Informations de la page de garde
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Titre du Prosit *</label>
+          <input type="text" name="titre_prosit" class="form-control"
+                 placeholder="ex: Prosit 4 — Les Architectes de l'Ordre"
+                 required>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Numéro de Prosit</label>
+            <input type="text" name="numero_prosit" class="form-control"
+                   placeholder="Prosit 4">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Promotion</label>
+            <input type="text" name="promotion" class="form-control"
+                   placeholder="X2028 — 3e année">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom de l'étudiant *</label>
+          <input type="text" name="etudiant" class="form-control"
+                 placeholder="MAWAMBA TOWA Maëva"
+                 value="{{ cer.etudiant if cer else '' }}" required>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Pilote</label>
+            <input type="text" name="pilote" class="form-control"
+                   placeholder="Mr BRUCE YOUMBI">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Co-pilote</label>
+            <input type="text" name="copilote" class="form-control"
+                   placeholder="Mr IGOR EWOLO">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenu académique -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i data-lucide="book-open" class="header-icon"></i>
+        Contenu du Prosit
+      </div>
+      <div class="card-body">
+
+        <div class="form-group">
+          <label class="form-label">
+            Analyse du contexte *
+            <span style="color:var(--text-muted);font-weight:400">
+              — Décris la situation de l'entreprise/problème du Prosit
+            </span>
+          </label>
+          <textarea name="contexte" class="form-control" rows="4"
+                    placeholder="Ex: L'équipe de TechMove Cameroun travaille sur une application de gestion des itinéraires..."
+                    required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Besoins identifiés *
+            <span style="color:var(--text-muted);font-weight:400">
+              — Liste les notions/concepts à étudier (une par ligne)
+            </span>
+          </label>
+          <textarea name="besoins" class="form-control" rows="5"
+                    placeholder="- Notions sur les graphes orientés / non orientés&#10;- Algorithmes de tri (QuickSort, MergeSort)&#10;- Algorithmes BFS et DFS&#10;..."
+                    required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Contraintes
+          </label>
+          <textarea name="contraintes" class="form-control" rows="3"
+                    placeholder="- Implémenter BFS et DFS pour vérifier la connexité&#10;- Utiliser un algorithme plus efficace que O(n²)&#10;...">
+          </textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Problématique *
+            <span style="color:var(--text-muted);font-weight:400">
+              — La question centrale sous forme de phrase interrogative
+            </span>
+          </label>
+          <textarea name="problematique" class="form-control" rows="3"
+                    placeholder="Comment améliorer les performances de l'application en sélectionnant les algorithmes et structures de données les plus adaptés ?"
+                    required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Plan d'action *
+            <span style="color:var(--text-muted);font-weight:400">
+              — Une étape par ligne (l'IA génèrera le contenu de chaque étape)
+            </span>
+          </label>
+          <textarea name="plan_action" class="form-control mono" rows="8"
+                    id="planAction"
+                    placeholder="Définition des mots clés&#10;Étude des algorithmes de tri (insertion, fusion, rapide)&#10;Étude de la complexité algorithmique&#10;Étude des structures de graphes&#10;Étude des algorithmes BFS et DFS&#10;Étude du tri topologique&#10;Algorithmes sur graphes pondérés (Dijkstra, Kruskal)&#10;Choix et validation des solutions pour le contexte"
+                    required></textarea>
+          <div class="form-hint">
+            <span id="nbEtapes" style="color:var(--accent);font-weight:500">0</span>
+            étape(s) détectée(s) — chaque étape génèrera ~400 mots
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Colonne droite -->
+  <div>
+
+    <!-- Upload corbeille / workshop -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i data-lucide="upload-cloud" class="header-icon"></i>
+        Corbeille / Workshop (optionnel)
+      </div>
+      <div class="card-body">
+        <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
+          Upload la corbeille et/ou le workshop du prosit pour enrichir 
+          le contenu généré par l'IA.
+        </p>
+        <div id="dropZone2" style="
+          border:2px dashed var(--border-light);
+          border-radius:var(--radius);
+          padding:20px;
+          text-align:center;
+          cursor:pointer;
+          background:var(--bg-elevated)">
+          <i data-lucide="upload-cloud"
+             style="width:28px;height:28px;color:var(--text-muted);
+                    margin:0 auto 8px;display:block;stroke-width:1.5"></i>
+          <div style="font-size:12.5px;color:var(--text-secondary)">
+            Glisse tes PDFs ici ou
+            <label for="fichiers"
+                   style="color:var(--accent);cursor:pointer;font-weight:500">
+              parcourir
+            </label>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            PDF, TXT — plusieurs fichiers acceptés
+          </div>
+          <input type="file" id="fichiers" name="fichiers"
+                 multiple accept=".pdf,.txt,.md"
+                 style="display:none"
+                 onchange="onFilesSelected(this)">
+        </div>
+        <div id="filesInfo" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- Estimation -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i data-lucide="info" class="header-icon"></i>
+        Estimation du CER
+      </div>
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="flex items-center justify-between">
+            <span style="font-size:12.5px;color:var(--text-secondary)">
+              Pages estimées
+            </span>
+            <span class="badge badge-accent" id="estPages">~8 pages</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span style="font-size:12.5px;color:var(--text-secondary)">
+              Mots estimés
+            </span>
+            <span class="badge badge-muted" id="estMots">~3000 mots</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span style="font-size:12.5px;color:var(--text-secondary)">
+              Temps génération
+            </span>
+            <span class="badge badge-muted" id="estTemps">~2-3 min</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <p style="font-size:11.5px;color:var(--text-muted);line-height:1.5">
+          L'IA génère chaque section indépendamment. Tu pourras régénérer 
+          une section spécifique si nécessaire.
+        </p>
+      </div>
+    </div>
+
+    <!-- Bouton submit -->
+    <button type="submit" class="btn btn-primary w-full"
+            id="btnCreer" style="padding:12px;font-size:14px">
+      <i data-lucide="arrow-right"></i>
+      Créer le CER et lancer la génération IA
+    </button>
+
+    <div id="loadingState"
+         style="display:none;text-align:center;padding:20px">
+      <div style="width:36px;height:36px;margin:0 auto 10px;
+                  border:3px solid var(--border);
+                  border-top-color:var(--danger);border-radius:50%;
+                  animation:spin 0.8s linear infinite"></div>
+      <div style="font-size:13px;color:var(--text-secondary)">
+        Création en cours…
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<style>
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+<script>
+// Compteur d'étapes
+document.getElementById('planAction').addEventListener('input', function() {
+  const lines = this.value.split('\n').filter(l => l.trim());
+  const nb    = lines.length;
+  document.getElementById('nbEtapes').textContent = nb;
+  document.getElementById('estPages').textContent =
+    `~${Math.max(8, nb * 1.5 + 4)} pages`;
+  document.getElementById('estMots').textContent =
+    `~${nb * 400 + 1500} mots`;
+  document.getElementById('estTemps').textContent =
+    `~${Math.ceil(nb * 0.4 + 1)} min`;
+});
+
+// Upload fichiers
+function onFilesSelected(input) {
+  const info = document.getElementById('filesInfo');
+  info.innerHTML = '';
+  Array.from(input.files).forEach(f => {
+    info.innerHTML += `
+      <div style="display:flex;align-items:center;gap:8px;
+                  background:var(--bg-elevated);border:1px solid var(--border);
+                  border-radius:var(--radius-sm);padding:8px 12px;margin-top:6px">
+        <i data-lucide="file" style="width:14px;height:14px;color:var(--accent)"></i>
+        <span style="font-size:12.5px;color:var(--text-primary)">${f.name}</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:auto">
+          ${(f.size/1024).toFixed(0)} KB
+        </span>
+      </div>`;
+  });
+  lucide.createIcons();
+}
+
+document.getElementById('dropZone2').addEventListener('click', () => {
+  document.getElementById('fichiers').click();
+});
+
+// Submit
+document.getElementById('formCER').addEventListener('submit', () => {
+  document.getElementById('btnCreer').style.display     = 'none';
+  document.getElementById('loadingState').style.display = 'block';
+});
+</script>
+{% endblock %}

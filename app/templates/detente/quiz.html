@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Quiz DevOps{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-3">
+  <a href="{{ url_for('detente.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+  <h1 style="font-size:18px;font-weight:600;margin:0">Quiz DevOps</h1>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="badge badge-success" id="lvlBadge">Niveau 1</span>
+    <span class="badge badge-muted"   id="qBadge">Q1/?</span>
+    <span class="badge badge-accent"  id="scoreBadge">0 pts</span>
+    <span class="badge badge-danger"  id="timerBadge" style="display:none">⏱ 30s</span>
+  </div>
+</div>
+
+<!-- Sélecteur de niveau -->
+<div id="levelSelector" style="max-width:700px;margin:0 auto 28px">
+  <div class="section-label">Choisir un niveau</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px">
+    {% for n in range(1,16) %}
+    <button onclick="startQuiz({{ n }})"
+            class="btn btn-secondary"
+            style="flex-direction:column;gap:3px;padding:10px 6px;
+                   font-size:12px;height:auto">
+      <span style="font-size:16px;font-weight:700;
+                   color:{% if n<=3 %}var(--success)
+                         {% elif n<=6 %}var(--accent)
+                         {% elif n<=9 %}var(--warning)
+                         {% elif n<=12 %}#f97316
+                         {% else %}var(--danger){% endif %}">
+        {{ n }}
+      </span>
+      <span style="font-size:10px;color:var(--text-muted)">
+        {% if n<=3 %}5q · Facile
+        {% elif n<=6 %}8q · Moyen
+        {% elif n<=9 %}10q · Inter.
+        {% elif n<=12 %}15q · Difficile
+        {% else %}20q · Expert{% endif %}
+      </span>
+    </button>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Zone de jeu -->
+<div id="gameArea" style="display:none;max-width:640px;margin:0 auto">
+
+  <!-- Progress -->
+  <div style="margin-bottom:16px">
+    <div class="progress-track" style="height:5px">
+      <div class="progress-fill success" id="progressBar" style="width:0%;transition:width 0.4s"></div>
+    </div>
+  </div>
+
+  <!-- Carte question -->
+  <div class="card mb-3" id="questionCard">
+    <div class="card-body" style="padding:28px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <span class="badge badge-muted" id="domainBadge">Domain</span>
+        <span class="badge" id="diffBadge" style="background:var(--warning-dim);color:var(--warning)">
+          Moyen
+        </span>
+      </div>
+      <div style="font-size:15px;font-weight:600;color:var(--text-primary);
+                  line-height:1.6;margin-bottom:24px" id="questionText">
+        Chargement…
+      </div>
+      <div id="answersGrid"
+           style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback -->
+  <div id="feedback" style="display:none" class="card mb-3">
+    <div class="card-body" style="padding:18px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div id="feedbackIcon"
+             style="width:32px;height:32px;border-radius:50%;display:flex;
+                    align-items:center;justify-content:center;flex-shrink:0">
+        </div>
+        <div id="feedbackText"
+             style="font-size:13.5px;font-weight:600;color:var(--text-primary)">
+        </div>
+      </div>
+      <div id="feedbackExplanation"
+           style="font-size:12.5px;color:var(--text-secondary);
+                  margin-left:42px;line-height:1.5">
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-primary" id="btnNext" onclick="nextQuestion()">
+          Suivant <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Résultat final -->
+<div id="resultArea" style="display:none;max-width:500px;margin:0 auto">
+  <div class="card">
+    <div class="card-body" style="padding:36px;text-align:center">
+      <div id="resultEmoji" style="font-size:56px;margin-bottom:16px"></div>
+      <div id="resultTitle"
+           style="font-size:22px;font-weight:700;color:var(--text-primary);
+                  margin-bottom:8px"></div>
+      <div id="resultScore"
+           style="font-size:38px;font-weight:800;color:var(--accent);
+                  font-family:var(--font-mono);margin-bottom:6px"></div>
+      <div id="resultMsg"
+           style="font-size:13px;color:var(--text-secondary);margin-bottom:24px"></div>
+
+      <!-- Stats détaillées -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;
+                  margin-bottom:24px">
+        <div style="background:var(--bg-elevated);border-radius:var(--radius-sm);
+                    padding:12px;text-align:center">
+          <div id="statCorrect"
+               style="font-size:22px;font-weight:700;color:var(--success)"></div>
+          <div style="font-size:11px;color:var(--text-muted)">Correctes</div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:var(--radius-sm);
+                    padding:12px;text-align:center">
+          <div id="statWrong"
+               style="font-size:22px;font-weight:700;color:var(--danger)"></div>
+          <div style="font-size:11px;color:var(--text-muted)">Incorrectes</div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:var(--radius-sm);
+                    padding:12px;text-align:center">
+          <div id="statTime"
+               style="font-size:22px;font-weight:700;color:var(--accent)"></div>
+          <div style="font-size:11px;color:var(--text-muted)">Secondes/q</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary"   onclick="startQuiz(currentLevel)">
+          <i data-lucide="refresh-cw"></i> Rejouer
+        </button>
+        <button class="btn btn-secondary" id="btnNextLevel"
+                onclick="startQuiz(currentLevel+1)">
+          Niveau suivant <i data-lucide="arrow-right"></i>
+        </button>
+        <button class="btn btn-ghost"     onclick="showLevelSelector()">
+          <i data-lucide="list"></i> Niveaux
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.answer-btn {
+  padding:13px 16px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border-light);
+  background:var(--bg-elevated);
+  color:var(--text-primary);
+  cursor:pointer;
+  font-size:13px;
+  font-family:var(--font-body);
+  text-align:left;
+  transition:all 0.15s;
+  line-height:1.4;
+}
+.answer-btn:hover:not(:disabled) {
+  background:var(--bg-hover);
+  border-color:var(--accent);
+  color:var(--text-primary);
+}
+.answer-btn.correct {
+  background:var(--success-dim);
+  border-color:rgba(16,185,129,0.5);
+  color:var(--success);
+  font-weight:600;
+}
+.answer-btn.wrong {
+  background:var(--danger-dim);
+  border-color:rgba(239,68,68,0.5);
+  color:var(--danger);
+}
+.answer-btn:disabled { cursor:default; }
+
+/* Timer animation */
+@keyframes timerPulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.5; }
+}
+.timer-urgent { animation:timerPulse 0.5s infinite; }
+</style>
+
+<script>
+// ── Config niveaux ────────────────────────────────────────────────────────────
+const LEVEL_TIMERS = [
+//  1     2     3     4     5     6     7     8     9    10    11    12    13    14    15
+    0,    0,    0,    30,   25,   20,   20,   18,   15,  15,   12,   12,   10,   10,   8
+];
+
+// ── État ──────────────────────────────────────────────────────────────────────
+let questions    = [];
+let currentQ     = 0;
+let score        = 0;
+let correct      = 0;
+let wrong        = 0;
+let currentLevel = 1;
+let timerInterval = null;
+let timeLeft     = 0;
+let questionStart = 0;
+let totalTime    = 0;
+let answered     = false;
+
+// ── Démarrer le quiz ──────────────────────────────────────────────────────────
+async function startQuiz(level) {
+  currentLevel = Math.max(1, Math.min(15, level));
+
+  // Reset
+  currentQ = 0; score = 0; correct = 0; wrong = 0;
+  totalTime = 0; answered = false;
+  clearInterval(timerInterval);
+
+  document.getElementById('levelSelector').style.display = 'none';
+  document.getElementById('gameArea').style.display      = 'block';
+  document.getElementById('resultArea').style.display    = 'none';
+  document.getElementById('feedback').style.display      = 'none';
+  document.getElementById('lvlBadge').textContent        = `Niveau ${currentLevel}`;
+  document.getElementById('scoreBadge').textContent      = '0 pts';
+
+  // Charger les questions depuis la route Flask
+  const resp = await fetch(`/detente/quiz/questions/${currentLevel}`);
+  questions  = await resp.json();
+
+  showQuestion();
+}
+
+// ── Afficher une question ─────────────────────────────────────────────────────
+function showQuestion() {
+  answered = false;
+  const q  = questions[currentQ];
+  clearInterval(timerInterval);
+
+  // Badges
+  document.getElementById('qBadge').textContent      = `Q${currentQ+1}/${questions.length}`;
+  document.getElementById('domainBadge').textContent = q.domain;
+  document.getElementById('questionText').textContent = q.q;
+  document.getElementById('feedback').style.display  = 'none';
+
+  // Difficulté
+  const diffEl    = document.getElementById('diffBadge');
+  const diffLabel = q.diff === 1 ? 'Facile' : q.diff === 2 ? 'Moyen' : 'Difficile';
+  const diffStyle = q.diff === 1
+    ? 'background:var(--success-dim);color:var(--success)'
+    : q.diff === 2
+    ? 'background:var(--warning-dim);color:var(--warning)'
+    : 'background:var(--danger-dim);color:var(--danger)';
+  diffEl.textContent = diffLabel;
+  diffEl.style.cssText = diffStyle;
+
+  // Progress
+  const pct = Math.round((currentQ / questions.length) * 100);
+  document.getElementById('progressBar').style.width = `${pct}%`;
+
+  // Réponses
+  const grid = document.getElementById('answersGrid');
+  grid.innerHTML = '';
+  q.choices.forEach((choice, i) => {
+    const btn = document.createElement('button');
+    btn.className   = 'answer-btn';
+    btn.textContent = choice;
+    btn.onclick     = () => checkAnswer(i);
+    grid.appendChild(btn);
+  });
+
+  // Timer
+  const timerEl  = document.getElementById('timerBadge');
+  const timerSec = LEVEL_TIMERS[currentLevel - 1];
+  questionStart  = Date.now();
+
+  if (timerSec > 0) {
+    timeLeft = timerSec;
+    timerEl.style.display     = 'inline-flex';
+    timerEl.textContent       = `⏱ ${timeLeft}s`;
+    timerEl.className         = 'badge badge-warning';
+    timerEl.classList.remove('timer-urgent');
+
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = `⏱ ${timeLeft}s`;
+      if (timeLeft <= 5) {
+        timerEl.className = 'badge badge-danger timer-urgent';
+      }
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        checkAnswer(-1); // Temps écoulé = réponse incorrecte
+      }
+    }, 1000);
+  } else {
+    timerEl.style.display = 'none';
+  }
+
+  lucide.createIcons();
+}
+
+// ── Vérifier la réponse ───────────────────────────────────────────────────────
+function checkAnswer(selectedIdx) {
+  if (answered) return;
+  answered = true;
+  clearInterval(timerInterval);
+
+  const q         = questions[currentQ];
+  const isCorrect = selectedIdx === q.correct;
+  const elapsed   = Math.round((Date.now() - questionStart) / 1000);
+  totalTime      += elapsed;
+
+  // Colorer les boutons
+  const btns = document.querySelectorAll('.answer-btn');
+  btns.forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.correct)                    btn.classList.add('correct');
+    else if (i === selectedIdx && !isCorrect) btn.classList.add('wrong');
+  });
+
+  // Scoring
+  let pts = 0;
+  if (isCorrect) {
+    correct++;
+    const timerBonus = LEVEL_TIMERS[currentLevel-1] > 0
+      ? Math.max(0, timeLeft * 2) : 0;
+    const diffBonus  = q.diff * 10;
+    pts              = 10 + diffBonus + timerBonus;
+    score           += pts;
+  } else {
+    wrong++;
+  }
+
+  document.getElementById('scoreBadge').textContent = `${score} pts`;
+
+  // Feedback
+  const feedbackEl = document.getElementById('feedback');
+  const iconEl     = document.getElementById('feedbackIcon');
+  const textEl     = document.getElementById('feedbackText');
+  const explEl     = document.getElementById('feedbackExplanation');
+  const btnNext    = document.getElementById('btnNext');
+
+  if (isCorrect) {
+    iconEl.style.background = 'var(--success-dim)';
+    iconEl.innerHTML = `<i data-lucide="check" style="width:16px;height:16px;color:var(--success)"></i>`;
+    textEl.textContent = `+${pts} points !`;
+    textEl.style.color = 'var(--success)';
+    explEl.textContent = selectedIdx === -1 ? '' : 'Bonne réponse !';
+  } else {
+    iconEl.style.background = 'var(--danger-dim)';
+    iconEl.innerHTML = `<i data-lucide="x" style="width:16px;height:16px;color:var(--danger)"></i>`;
+    textEl.textContent = selectedIdx === -1 ? 'Temps écoulé !' : 'Incorrect !';
+    textEl.style.color = 'var(--danger)';
+    explEl.textContent = `La bonne réponse était : "${q.choices[q.correct]}"`;
+  }
+
+  btnNext.textContent = currentQ + 1 < questions.length
+    ? 'Suivant →' : 'Voir le résultat';
+
+  feedbackEl.style.display = 'block';
+  lucide.createIcons();
+}
+
+// ── Question suivante ─────────────────────────────────────────────────────────
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= questions.length) {
+    showResult();
+  } else {
+    showQuestion();
+  }
+}
+
+// ── Résultat final ────────────────────────────────────────────────────────────
+function showResult() {
+  document.getElementById('gameArea').style.display  = 'none';
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('progressBar').style.width  = '100%';
+
+  const pct  = Math.round((correct / questions.length) * 100);
+  const avgT = questions.length > 0
+    ? Math.round(totalTime / questions.length) : 0;
+
+  let emoji, title, msg;
+  if (pct === 100) { emoji='🏆'; title='Score parfait !';   msg='Incroyable, tu maîtrises tout !'; }
+  else if (pct>=80) { emoji='🎯'; title='Excellent !';        msg='Tu es presque un expert !'; }
+  else if (pct>=60) { emoji='👍'; title='Bien joué !';        msg='Encore un peu de pratique !'; }
+  else if (pct>=40) { emoji='📚'; title='Peut mieux faire !'; msg='Révise et réessaie !'; }
+  else              { emoji='💪'; title='Continue à apprendre !'; msg='Ne lâche pas !'; }
+
+  document.getElementById('resultEmoji').textContent = emoji;
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultScore').textContent = `${pct}% · ${score} pts`;
+  document.getElementById('resultMsg').textContent   = msg;
+  document.getElementById('statCorrect').textContent = correct;
+  document.getElementById('statWrong').textContent   = wrong;
+  document.getElementById('statTime').textContent    = avgT;
+  document.getElementById('btnNextLevel').style.display =
+    currentLevel < 15 ? 'inline-flex' : 'none';
+
+  lucide.createIcons();
+}
+
+function showLevelSelector() {
+  document.getElementById('gameArea').style.display   = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('levelSelector').style.display = 'block';
+}
+</script>
+{% endblock %}

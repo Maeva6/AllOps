@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Coin Détente{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Coin Détente</h1>
+  <p>Quatre jeux avec 15 niveaux chacun — du plus simple au plus difficile</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+
+  <!-- Memory -->
+  <a href="{{ url_for('detente.memory') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:all 0.2s;overflow:visible">
+      <div style="height:4px;background:var(--accent)"></div>
+      <div class="card-body" style="padding:28px;text-align:center">
+        <div style="width:64px;height:64px;border-radius:var(--radius-lg);
+                    background:var(--accent-glow);border:1px solid var(--accent-dim);
+                    display:flex;align-items:center;justify-content:center;
+                    margin:0 auto 18px;font-size:28px">
+          🃏
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-primary);
+                    margin-bottom:8px">Memory</div>
+        <div style="font-size:13px;color:var(--text-secondary);
+                    line-height:1.6;margin-bottom:16px">
+          Retrouve les paires de cartes.<br>
+          Grille dynamique jusqu'à 8×8.
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-accent">15 niveaux</span>
+          <span class="badge badge-muted">4×4 → 8×8</span>
+          <span class="badge badge-muted">Timer</span>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- Quiz -->
+  <a href="{{ url_for('detente.quiz') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:all 0.2s">
+      <div style="height:4px;background:var(--success)"></div>
+      <div class="card-body" style="padding:28px;text-align:center">
+        <div style="width:64px;height:64px;border-radius:var(--radius-lg);
+                    background:var(--success-dim);border:1px solid rgba(16,185,129,0.2);
+                    display:flex;align-items:center;justify-content:center;
+                    margin:0 auto 18px;font-size:28px">
+          🧠
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-primary);
+                    margin-bottom:8px">Quiz DevOps</div>
+        <div style="font-size:13px;color:var(--text-secondary);
+                    line-height:1.6;margin-bottom:16px">
+          80+ questions générées dynamiquement.<br>
+          Docker, Git, Linux, CI/CD, Cloud…
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-success">15 niveaux</span>
+          <span class="badge badge-muted">80+ questions</span>
+          <span class="badge badge-muted">Timer</span>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- Taquin -->
+  <a href="{{ url_for('detente.taquin') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:all 0.2s">
+      <div style="height:4px;background:var(--warning)"></div>
+      <div class="card-body" style="padding:28px;text-align:center">
+        <div style="width:64px;height:64px;border-radius:var(--radius-lg);
+                    background:var(--warning-dim);border:1px solid rgba(245,158,11,0.2);
+                    display:flex;align-items:center;justify-content:center;
+                    margin:0 auto 18px;font-size:28px">
+          🧩
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-primary);
+                    margin-bottom:8px">Taquin</div>
+        <div style="font-size:13px;color:var(--text-secondary);
+                    line-height:1.6;margin-bottom:16px">
+          Remets les tuiles dans l'ordre.<br>
+          Grille 3×3 jusqu'à 5×5.
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-warning">15 niveaux</span>
+          <span class="badge badge-muted">3×3 → 5×5</span>
+          <span class="badge badge-muted">Score optimal</span>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- Démineur -->
+  <a href="{{ url_for('detente.demineur') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:all 0.2s">
+      <div style="height:4px;background:var(--danger)"></div>
+      <div class="card-body" style="padding:28px;text-align:center">
+        <div style="width:64px;height:64px;border-radius:var(--radius-lg);
+                    background:var(--danger-dim);border:1px solid rgba(239,68,68,0.2);
+                    display:flex;align-items:center;justify-content:center;
+                    margin:0 auto 18px;font-size:28px">
+          💣
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-primary);
+                    margin-bottom:8px">Démineur</div>
+        <div style="font-size:13px;color:var(--text-secondary);
+                    line-height:1.6;margin-bottom:16px">
+          Trouve toutes les mines.<br>
+          Algorithme flood-fill en cascade.
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-danger">15 niveaux</span>
+          <span class="badge badge-muted">8×8 → 20×20</span>
+          <span class="badge badge-muted">Flood-fill</span>
+        </div>
+      </div>
+    </div>
+  </a>
+
+</div>
+{% endblock %}

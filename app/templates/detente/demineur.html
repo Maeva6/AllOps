@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Démineur{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-3">
+  <a href="{{ url_for('detente.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+  <h1 style="font-size:18px;font-weight:600;margin:0">Démineur</h1>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="badge badge-danger"  id="lvlBadge">Niveau 1</span>
+    <span class="badge badge-warning" id="minesBadge">💣 10</span>
+    <span class="badge badge-muted"   id="timerBadge">⏱ 0s</span>
+    <span class="badge badge-accent"  id="flagsBadge">🚩 0</span>
+  </div>
+</div>
+
+<p class="text-secondary text-sm mb-3" style="max-width:600px">
+  <strong>Clic gauche</strong> : révéler · <strong>Clic droit</strong> : poser/enlever un drapeau
+</p>
+
+<!-- Sélecteur de niveau -->
+<div id="levelSelector" style="max-width:700px;margin:0 auto 28px">
+  <div class="section-label">Choisir un niveau</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+    {% for n in range(1,16) %}
+    <button onclick="startGame({{ n }})"
+            class="btn btn-secondary"
+            style="flex-direction:column;gap:3px;padding:10px 6px;
+                   font-size:12px;height:auto">
+      <span style="font-size:16px;font-weight:700;
+                   color:{% if n<=3 %}var(--success)
+                         {% elif n<=6 %}var(--accent)
+                         {% elif n<=9 %}var(--warning)
+                         {% elif n<=12 %}#f97316
+                         {% else %}var(--danger){% endif %}">
+        {{ n }}
+      </span>
+      <span style="font-size:10px;color:var(--text-muted)">
+        {% if n<=3 %}8×8{% elif n<=6 %}10×10{% elif n<=9 %}12×12{% elif n<=12 %}16×16{% else %}20×20{% endif %}
+      </span>
+    </button>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Zone de jeu -->
+<div id="gameArea" style="display:none">
+  <div id="board"
+       style="display:inline-grid;gap:3px;margin:0 auto;
+              display:flex;flex-wrap:wrap;justify-content:center;
+              overflow-x:auto;padding:4px">
+  </div>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+    <button class="btn btn-secondary" onclick="startGame(currentLevel)">
+      <i data-lucide="refresh-cw"></i> Nouvelle partie
+    </button>
+    <button class="btn btn-ghost" onclick="showLevelSelector()">
+      <i data-lucide="list"></i> Niveaux
+    </button>
+  </div>
+</div>
+
+<!-- Résultat -->
+<div id="resultBanner"
+     style="display:none;max-width:400px;margin:20px auto;text-align:center">
+  <div class="card">
+    <div class="card-body" style="padding:32px">
+      <div id="resultEmoji" style="font-size:48px;margin-bottom:12px"></div>
+      <div id="resultTitle"
+           style="font-size:20px;font-weight:700;color:var(--text-primary);
+                  margin-bottom:8px"></div>
+      <div id="resultSub"
+           style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-primary"   onclick="startGame(currentLevel)">
+          <i data-lucide="refresh-cw"></i> Rejouer
+        </button>
+        <button class="btn btn-secondary" id="btnNext" onclick="nextLevel()">
+          Niveau suivant <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.cell {
+  display:flex;align-items:center;justify-content:center;
+  border-radius:4px;
+  cursor:pointer;
+  font-weight:700;
+  font-family:var(--font-mono);
+  border:1px solid var(--border-light);
+  background:var(--bg-elevated);
+  user-select:none;
+  transition:background 0.1s, transform 0.1s;
+  flex-shrink:0;
+}
+.cell:hover:not(.revealed):not(.exploded) {
+  background:var(--bg-hover);
+  transform:scale(0.95);
+}
+.cell.revealed {
+  background:var(--bg-base);
+  border-color:var(--border);
+  cursor:default;
+}
+.cell.flagged  { background:var(--warning-dim); border-color:rgba(245,158,11,0.3); }
+.cell.exploded { background:var(--danger);       border-color:var(--danger); }
+.cell.mine-shown { background:var(--danger-dim); border-color:rgba(239,68,68,0.3); }
+
+/* Couleurs des chiffres */
+.n1{color:#2563eb} .n2{color:#16a34a} .n3{color:#dc2626}
+.n4{color:#7c3aed} .n5{color:#b91c1c} .n6{color:#0891b2}
+.n7{color:#374151} .n8{color:#6b7280}
+</style>
+
+<script>
+// ── Config 15 niveaux ──────────────────────────────────────────────────────────
+const LEVELS = [
+  /* 1 */ { cols:8,  rows:8,  mines:10 },
+  /* 2 */ { cols:8,  rows:8,  mines:12 },
+  /* 3 */ { cols:8,  rows:8,  mines:15 },
+  /* 4 */ { cols:10, rows:10, mines:18 },
+  /* 5 */ { cols:10, rows:10, mines:22 },
+  /* 6 */ { cols:10, rows:10, mines:28 },
+  /* 7 */ { cols:12, rows:12, mines:30 },
+  /* 8 */ { cols:12, rows:12, mines:38 },
+  /* 9 */ { cols:12, rows:12, mines:46 },
+  /*10 */ { cols:16, rows:16, mines:55 },
+  /*11 */ { cols:16, rows:16, mines:65 },
+  /*12 */ { cols:16, rows:16, mines:78 },
+  /*13 */ { cols:20, rows:20, mines:80 },
+  /*14 */ { cols:20, rows:20, mines:95 },
+  /*15 */ { cols:20, rows:20, mines:110},
+];
+
+// ── État global ────────────────────────────────────────────────────────────────
+let grid = [], revealed = [], flagged = [], mines = new Set();
+let rows, cols, totalMines, currentLevel = 1;
+let gameOver = false, firstClick = true;
+let timerInterval = null, elapsed = 0, flagCount = 0;
+
+// ── Démarrer une partie ────────────────────────────────────────────────────────
+function startGame(level) {
+  currentLevel = level;
+  const cfg = LEVELS[level - 1];
+  rows = cfg.rows; cols = cfg.cols; totalMines = cfg.mines;
+
+  gameOver = true; // Bloque les clics pendant init
+  firstClick = true;
+  flagCount  = 0;
+  clearInterval(timerInterval);
+  elapsed = 0;
+
+  // Initialiser tableaux vides
+  grid     = Array.from({ length: rows }, () => Array(cols).fill(0));
+  revealed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  flagged  = Array.from({ length: rows }, () => Array(cols).fill(false));
+  mines    = new Set();
+
+  // UI
+  document.getElementById('levelSelector').style.display = 'none';
+  document.getElementById('gameArea').style.display      = 'block';
+  document.getElementById('resultBanner').style.display  = 'none';
+  document.getElementById('lvlBadge').textContent        = `Niveau ${level}`;
+  document.getElementById('minesBadge').textContent      = `💣 ${totalMines}`;
+  document.getElementById('timerBadge').textContent      = '⏱ 0s';
+  document.getElementById('flagsBadge').textContent      = `🚩 0/${totalMines}`;
+
+  gameOver = false;
+  render();
+}
+
+// ── Placer les mines après le 1er clic (jamais sur la 1re case cliquée) ────────
+function placeMines(safeR, safeC) {
+  const safe = new Set();
+  // Zone de sécurité autour du 1er clic (3×3)
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      const nr = safeR + dr, nc = safeC + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols)
+        safe.add(nr * cols + nc);
+    }
+
+  let placed = 0;
+  while (placed < totalMines) {
+    const idx = Math.floor(Math.random() * rows * cols);
+    if (!safe.has(idx) && !mines.has(idx)) {
+      mines.add(idx);
+      placed++;
+    }
+  }
+
+  // Calculer les chiffres
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if (mines.has(r * cols + c)) { grid[r][c] = -1; continue; }
+      let count = 0;
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = r+dr, nc = c+dc;
+          if (nr>=0 && nr<rows && nc>=0 && nc<cols && mines.has(nr*cols+nc))
+            count++;
+        }
+      grid[r][c] = count;
+    }
+
+  // Démarrer le timer
+  timerInterval = setInterval(() => {
+    elapsed++;
+    document.getElementById('timerBadge').textContent = `⏱ ${elapsed}s`;
+  }, 1000);
+}
+
+// ── Flood-fill BFS (révélation en cascade) ────────────────────────────────────
+function floodFill(startR, startC) {
+  const queue = [[startR, startC]];
+  while (queue.length > 0) {
+    const [r, c] = queue.shift();
+    if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+    if (revealed[r][c] || flagged[r][c])            continue;
+
+    revealed[r][c] = true;
+
+    if (grid[r][c] === 0) { // Case vide → propager
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++)
+          if (dr !== 0 || dc !== 0)
+            queue.push([r+dr, c+dc]);
+    }
+  }
+}
+
+// ── Clic gauche ───────────────────────────────────────────────────────────────
+function onLeftClick(r, c) {
+  if (gameOver || revealed[r][c] || flagged[r][c]) return;
+
+  if (firstClick) {
+    firstClick = false;
+    placeMines(r, c);
+  }
+
+  if (mines.has(r * cols + c)) {
+    // BOOM
+    revealed[r][c] = true;
+    gameOver = true;
+    clearInterval(timerInterval);
+    revealAllMines(r, c);
+    render();
+    setTimeout(() => showResult(false, `💥 Mine touchée après ${elapsed}s !`), 600);
+    return;
+  }
+
+  floodFill(r, c);
+  render();
+  checkWin();
+}
+
+// ── Clic droit (drapeau) ──────────────────────────────────────────────────────
+function onRightClick(e, r, c) {
+  e.preventDefault();
+  if (gameOver || revealed[r][c]) return;
+
+  if (flagged[r][c]) {
+    flagged[r][c] = false;
+    flagCount--;
+  } else {
+    flagged[r][c] = true;
+    flagCount++;
+  }
+  document.getElementById('flagsBadge').textContent =
+    `🚩 ${flagCount}/${totalMines}`;
+  render();
+}
+
+// ── Révéler toutes les mines (fin de partie) ──────────────────────────────────
+function revealAllMines(explodedR, explodedC) {
+  mines.forEach(idx => {
+    const r = Math.floor(idx / cols), c = idx % cols;
+    if (!(r === explodedR && c === explodedC))
+      revealed[r][c] = 'mine';
+  });
+}
+
+// ── Vérifier la victoire ──────────────────────────────────────────────────────
+function checkWin() {
+  let unrevealed = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (!revealed[r][c] && !mines.has(r * cols + c))
+        unrevealed++;
+
+  if (unrevealed === 0) {
+    gameOver = true;
+    clearInterval(timerInterval);
+    showResult(true, `✅ Terminé en ${elapsed}s ! Toutes les mines évitées.`);
+  }
+}
+
+// ── Rendu ─────────────────────────────────────────────────────────────────────
+function render() {
+  const el = document.getElementById('board');
+  const sz = cols >= 20 ? 28 : cols >= 16 ? 34 : cols >= 12 ? 40 : cols >= 10 ? 46 : 52;
+
+  el.style.cssText = `
+    display:grid;
+    grid-template-columns:repeat(${cols},${sz}px);
+    gap:3px;
+    background:var(--bg-elevated);
+    padding:10px;
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    width:fit-content;
+    margin:0 auto;
+  `;
+  el.innerHTML = '';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.width  = `${sz}px`;
+      cell.style.height = `${sz}px`;
+      cell.style.fontSize = `${sz <= 34 ? 12 : sz <= 40 ? 14 : 16}px`;
+
+      const rev = revealed[r][c];
+      const flg = flagged[r][c];
+      const val = grid[r][c];
+
+      if (rev === 'mine') {
+        cell.classList.add('mine-shown');
+        cell.textContent = '💣';
+      } else if (r * cols + c === (rev && val === -1) || (rev && val === -1)) {
+        cell.classList.add('exploded');
+        cell.textContent = '💥';
+      } else if (rev) {
+        cell.classList.add('revealed');
+        if (val > 0) {
+          cell.textContent = val;
+          cell.classList.add(`n${val}`);
+        }
+      } else if (flg) {
+        cell.classList.add('flagged');
+        cell.textContent = '🚩';
+      }
+
+      cell.addEventListener('click',       () => onLeftClick(r, c));
+      cell.addEventListener('contextmenu', (e) => onRightClick(e, r, c));
+      el.appendChild(cell);
+    }
+  }
+}
+
+// ── Résultat ──────────────────────────────────────────────────────────────────
+function showResult(win, msg) {
+  document.getElementById('resultBanner').style.display = 'block';
+  document.getElementById('resultEmoji').textContent    = win ? '🏆' : '💥';
+  document.getElementById('resultTitle').textContent    = win ? 'Victoire !' : 'Perdu !';
+  document.getElementById('resultSub').textContent      = msg;
+  document.getElementById('btnNext').style.display      =
+    win && currentLevel < 15 ? 'inline-flex' : 'none';
+  lucide.createIcons();
+}
+
+function nextLevel()        { startGame(Math.min(currentLevel + 1, 15)); }
+function showLevelSelector() {
+  document.getElementById('gameArea').style.display      = 'none';
+  document.getElementById('resultBanner').style.display  = 'none';
+  document.getElementById('levelSelector').style.display = 'block';
+}
+</script>
+{% endblock %}

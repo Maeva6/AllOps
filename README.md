@@ -3,7 +3,7 @@
 > Plateforme d'automatisation des tâches quotidiennes et de suivi
 > des certifications pour étudiants en ingénierie informatique.
 
-![CI Pipeline](https://github.com/TON_USERNAME/AllOps/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/Maeva6/AllOps/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.1-green)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
@@ -75,7 +75,7 @@ markdown# AllOps 🚀
 > Plateforme d'automatisation des tâches quotidiennes et de suivi
 > des certifications pour étudiants en ingénierie informatique.
 
-![CI Pipeline](https://github.com/TON_USERNAME/AllOps/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/Maeva6/AllOps/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.1-green)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)

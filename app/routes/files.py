@@ -14,7 +14,7 @@ files_bp = Blueprint('files', __name__, url_prefix='/files')
 def index():
     operations = FileOperation.query.order_by(
         FileOperation.created_at.desc()
-    ).limit(10).all()
+    ).limit(20).all()   # ← 10 → 20
     return render_template('modules/files.html',
                            title="Gestion des Fichiers",
                            operations=operations)
@@ -565,11 +565,11 @@ def annuler_organisation(id):
 # ─── Historique des organisations ─────────────────────────────────────────────
 @files_bp.route('/historique')
 def historique():
-    snapshots = OrganisationSnapshot.query.order_by(
-        OrganisationSnapshot.created_at.desc()
+    snapshots = FileOperation.query.order_by(
+        FileOperation.created_at.desc()
     ).all()
     return render_template('modules/historique.html',
-                           title="Historique des organisations",
+                           title="Historique",
                            snapshots=snapshots)
 
 

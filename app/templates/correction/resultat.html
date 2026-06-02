@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Correction — {{ session_obj.titre[:30] }}{% endblock %}
+
+{% block content %}
+
+<div class="flex items-center gap-3 mb-4">
+  <a href="{{ url_for('correction.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+  <div style="flex:1">
+    <h1 style="font-size:17px;font-weight:600;margin:0">
+      {{ session_obj.titre }}
+    </h1>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+      {{ types_doc.get(session_obj.type_doc, session_obj.type_doc) }} ·
+      {{ session_obj.created_at.strftime('%d/%m/%Y à %H:%M') }}
+    </div>
+  </div>
+
+  <!-- Boutons d'export -->
+  <div class="flex gap-2" id="exportBtns">
+    <button class="btn btn-secondary btn-sm"
+            onclick="window.print()"
+            title="Imprimer">
+      <i data-lucide="printer"></i>
+      <span class="hide-mobile">Imprimer</span>
+    </button>
+
+    <a href="{{ url_for('correction.export_latex', id=session_obj.id) }}"
+       class="btn btn-secondary btn-sm" title="Télécharger le .tex Overleaf"
+       id="btnTex">
+      <i data-lucide="code"></i>
+      <span class="hide-mobile">.tex</span>
+    </a>
+
+    <a href="{{ url_for('correction.export_pdf', id=session_obj.id) }}"
+       class="btn btn-danger btn-sm" title="Télécharger le PDF"
+       id="btnPdf"
+       onclick="showExportLoading(this, 'PDF en cours...')">
+      <i data-lucide="file-text"></i>
+      <span class="hide-mobile">PDF</span>
+    </a>
+
+    <a href="{{ url_for('correction.export_word', id=session_obj.id) }}"
+       class="btn btn-secondary btn-sm" title="Télécharger le Word"
+       id="btnWord"
+       onclick="showExportLoading(this, 'Word en cours...')">
+      <i data-lucide="file"></i>
+      <span class="hide-mobile">Word</span>
+    </a>
+  </div>
+</div>
+
+<!-- Bandeau d'info export -->
+<div id="exportInfo" style="display:none"
+     class="alert alert-info mb-4">
+  <div style="width:16px;height:16px;border:2px solid var(--border);
+              border-top-color:var(--accent);border-radius:50%;
+              animation:spin 0.8s linear infinite;flex-shrink:0"></div>
+  <div class="alert-content" id="exportMsg">Génération en cours…</div>
+</div>
+
+<!-- Résumé pédagogique -->
+{% if resume %}
+<div class="card mb-4"
+     style="border-left:3px solid var(--accent)">
+  <div class="card-header">
+    <i data-lucide="layers" class="header-icon"></i>
+    Synthèse pédagogique
+  </div>
+  <div class="card-body"
+       style="font-size:14px;line-height:1.8;color:var(--text-secondary)">
+    {{ resume | replace('\n', '<br>') | safe }}
+  </div>
+</div>
+{% endif %}
+
+<!-- Stats -->
+{% if corrections %}
+<div class="stat-grid"
+     style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Total</span>
+      <i data-lucide="list" class="stat-icon text-accent"></i>
+    </div>
+    <div class="stat-value text-accent">{{ corrections|length }}</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Faciles</span>
+      <i data-lucide="check-circle" class="stat-icon text-success"></i>
+    </div>
+    <div class="stat-value text-success">
+      {{ corrections | selectattr('difficulte','eq','facile') | list | length }}
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Moyens</span>
+      <i data-lucide="minus-circle" class="stat-icon text-warning"></i>
+    </div>
+    <div class="stat-value text-warning">
+      {{ corrections | selectattr('difficulte','eq','moyen') | list | length }}
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Difficiles</span>
+      <i data-lucide="alert-circle" class="stat-icon text-danger"></i>
+    </div>
+    <div class="stat-value text-danger">
+      {{ corrections | selectattr('difficulte','eq','difficile') | list | length }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Corrections -->
+{% if corrections %}
+
+  <!-- Boutons tout ouvrir/fermer -->
+  <div class="flex gap-2 mb-3">
+    <button class="btn btn-secondary btn-sm"
+            onclick="toggleAll(true)">
+      <i data-lucide="chevrons-down"></i> Tout ouvrir
+    </button>
+    <button class="btn btn-secondary btn-sm"
+            onclick="toggleAll(false)">
+      <i data-lucide="chevrons-up"></i> Tout fermer
+    </button>
+  </div>
+
+  {% for item in corrections %}
+  {% set diff = item.difficulte | default('moyen') %}
+  {% set diff_class = 'badge-success' if diff == 'facile'
+                 else 'badge-danger'   if diff == 'difficile'
+                 else 'badge-warning' %}
+  {% set border_color = 'var(--success)' if diff == 'facile'
+                   else 'var(--danger)'  if diff == 'difficile'
+                   else 'var(--warning)' %}
+
+  <div class="card mb-3 exo-card"
+       id="exo-card-{{ loop.index0 }}"
+       style="border-left:3px solid {{ border_color }}">
+
+    <!-- En-tête cliquable -->
+    <div style="
+      padding:14px 20px;
+      background:var(--bg-elevated);
+      border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:12px;
+      cursor:pointer"
+         onclick="toggleExo({{ loop.index0 }})">
+
+      <span style="
+        width:30px;height:30px;border-radius:50%;
+        background:{% if diff == 'facile' %}var(--success-dim)
+                   {% elif diff == 'difficile' %}var(--danger-dim)
+                   {% else %}var(--warning-dim){% endif %};
+        display:flex;align-items:center;justify-content:center;
+        font-size:12px;font-weight:700;flex-shrink:0;
+        color:{% if diff == 'facile' %}var(--success)
+              {% elif diff == 'difficile' %}var(--danger)
+              {% else %}var(--warning){% endif %}">
+        {{ loop.index }}
+      </span>
+
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">
+          {{ item.numero }}
+        </div>
+        <div style="
+          font-size:12px;color:var(--text-muted);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          {{ (item.enonce or '') | replace('\n', ' ') | truncate(80) }}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="badge {{ diff_class }}">{{ diff | capitalize }}</span>
+        {% if item.notions %}
+        <span style="font-size:11px;color:var(--text-muted)">
+          {{ item.notions | length }} notion(s)
+        </span>
+        {% endif %}
+        <i data-lucide="chevron-down"
+           style="width:16px;height:16px;color:var(--text-muted);
+                  transition:transform 0.2s"
+           id="chev-{{ loop.index0 }}"></i>
+      </div>
+    </div>
+
+    <!-- Contenu déroulant -->
+    <div id="exo-body-{{ loop.index0 }}"
+         class="card-body exo-body"
+         style="display:none">
+
+      <!-- Énoncé -->
+      <div class="correction-section">
+        <div class="correction-label" style="color:var(--text-muted)">
+          <i data-lucide="file-text"
+             style="width:13px;height:13px;vertical-align:middle"></i>
+          Énoncé
+        </div>
+        <div class="correction-box"
+             style="background:var(--bg-elevated);
+                    border:1px solid var(--border-light)">
+          {{ (item.enonce or '—') | replace('\n', '<br>') | safe }}
+        </div>
+      </div>
+
+      <!-- Réponse correcte -->
+      <div class="correction-section">
+        <div class="correction-label" style="color:var(--success)">
+          <i data-lucide="check-circle"
+             style="width:13px;height:13px;vertical-align:middle"></i>
+          Réponse correcte
+        </div>
+        <div class="correction-box"
+             style="background:var(--success-dim);
+                    border:1px solid rgba(16,185,129,0.25)">
+          {{ (item.reponse or '—') | replace('\n', '<br>') | safe }}
+        </div>
+      </div>
+
+      <!-- Explication -->
+      <div class="correction-section">
+        <div class="correction-label" style="color:var(--accent)">
+          <i data-lucide="lightbulb"
+             style="width:13px;height:13px;vertical-align:middle"></i>
+          Explication détaillée
+        </div>
+        <div style="font-size:13.5px;line-height:1.8;color:var(--text-primary)">
+          {{ (item.explication or '—') | replace('\n', '<br>') | safe }}
+        </div>
+      </div>
+
+      <!-- Notions + Conseils côte à côte -->
+      {% if item.notions or item.conseils %}
+      <div style="display:grid;grid-template-columns:
+                  {% if item.notions and item.conseils %}1fr 1fr{% else %}1fr{% endif %};
+                  gap:14px;margin-top:16px">
+
+        {% if item.notions %}
+        <div style="
+          background:var(--bg-elevated);
+          border-radius:var(--radius-sm);
+          padding:14px">
+          <div class="correction-label"
+               style="color:var(--text-muted);margin-bottom:10px">
+            <i data-lucide="tag"
+               style="width:12px;height:12px;vertical-align:middle"></i>
+            Notions clés
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            {% for notion in item.notions %}
+            <span class="badge badge-accent">{{ notion }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if item.conseils %}
+        <div style="
+          background:var(--warning-dim);
+          border:1px solid rgba(245,158,11,0.2);
+          border-radius:var(--radius-sm);
+          padding:14px">
+          <div class="correction-label"
+               style="color:var(--warning);margin-bottom:8px">
+            <i data-lucide="alert-triangle"
+               style="width:12px;height:12px;vertical-align:middle"></i>
+            À retenir / Erreurs classiques
+          </div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.6">
+            {{ item.conseils | replace('\n', '<br>') | safe }}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div style="text-align:center;padding:64px">
+    <i data-lucide="alert-circle"
+       style="width:48px;height:48px;color:var(--danger);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">Aucune correction générée.</p>
+    <a href="{{ url_for('correction.corriger', id=session_obj.id) }}"
+       class="btn btn-primary" style="margin-top:12px">
+      <i data-lucide="refresh-cw"></i> Réessayer
+    </a>
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.correction-section  { margin-bottom: 18px; }
+.correction-label    {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.correction-box {
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .hide-mobile { display: none; }
+}
+
+@media print {
+  .sidebar, .topbar, #exportBtns,
+  button, .stat-grid { display: none !important; }
+  .exo-body { display: block !important; }
+  .card { break-inside: avoid; page-break-inside: avoid; }
+  body { background: white; color: black; }
+  .correction-box { border: 1px solid #ccc !important;
+                    background: #f9f9f9 !important; }
+}
+</style>
+
+<script>
+// ── Toggle exercice ───────────────────────────────────────────────────────────
+function toggleExo(i) {
+  const body = document.getElementById('exo-body-' + i);
+  const chev = document.getElementById('chev-' + i);
+  const open = body.style.display !== 'none';
+  body.style.display    = open ? 'none' : 'block';
+  chev.style.transform  = open ? '' : 'rotate(180deg)';
+}
+
+function toggleAll(open) {
+  const bodies = document.querySelectorAll('.exo-body');
+  const chevs  = document.querySelectorAll('[id^="chev-"]');
+  bodies.forEach(b => b.style.display = open ? 'block' : 'none');
+  chevs.forEach(c  => c.style.transform = open ? 'rotate(180deg)' : '');
+}
+
+// Ouvrir le premier par défaut
+if (document.getElementById('exo-body-0')) {
+  toggleExo(0);
+}
+
+// ── Loading export ────────────────────────────────────────────────────────────
+function showExportLoading(btn, msg) {
+  const info = document.getElementById('exportInfo');
+  const txt  = document.getElementById('exportMsg');
+  txt.textContent = msg;
+  info.style.display = 'flex';
+
+  // Cacher après 30s (le téléchargement est parti)
+  setTimeout(() => {
+    info.style.display = 'none';
+  }, 30000);
+}
+</script>
+{% endblock %}

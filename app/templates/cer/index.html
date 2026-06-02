@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block breadcrumb %}CER{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Cahiers d'Étude et de Recherche</h1>
+    <p>Génère tes CERs automatiquement à partir des Prosits UCAC-ICAM</p>
+  </div>
+  <a href="{{ url_for('cer.nouveau') }}" class="btn btn-primary">
+    <i data-lucide="plus"></i> Nouveau CER
+  </a>
+</div>
+
+{% if cers %}
+  {% for c in cers %}
+  <div class="card mb-3">
+    <div class="card-body" style="padding:18px 20px">
+      <div class="flex items-center gap-3">
+        <div style="width:40px;height:40px;border-radius:var(--radius-sm);
+                    background:var(--danger-dim);flex-shrink:0;
+                    display:flex;align-items:center;justify-content:center">
+          <i data-lucide="file-text"
+             style="width:18px;height:18px;color:var(--danger)"></i>
+        </div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px;color:var(--text-primary)">
+            {{ c.titre_prosit }}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+            {{ c.etudiant }}
+            {% if c.promotion %} · {{ c.promotion }}{% endif %}
+            · {{ c.created_at.strftime('%d/%m/%Y') }}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          {% if c.statut == 'genere' %}
+            <span class="badge badge-success">
+              <i data-lucide="check"></i> Généré
+            </span>
+          {% else %}
+            <span class="badge badge-warning">
+              <i data-lucide="clock"></i> Brouillon
+            </span>
+          {% endif %}
+          <a href="{{ url_for('cer.voir', id=c.id) }}"
+             class="btn btn-secondary btn-sm">
+            <i data-lucide="eye"></i>
+          </a>
+          <form action="{{ url_for('cer.supprimer', id=c.id) }}"
+                method="POST">
+            <button class="btn btn-danger btn-sm"
+                    onclick="return confirm('Supprimer ce CER ?')">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="text-align:center;padding:64px">
+    <i data-lucide="file-text"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">Aucun CER créé pour l'instant</p>
+    <a href="{{ url_for('cer.nouveau') }}" class="btn btn-primary"
+       style="margin-top:12px">
+      <i data-lucide="plus"></i> Créer mon premier CER
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

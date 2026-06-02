@@ -1,220 +1,202 @@
 {% extends "base.html" %}
+{% block breadcrumb %}Certifications{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+
+<div class="page-header flex items-center justify-between">
   <div>
-    <h2>🎯 Suivi des Certifications</h2>
-    <p class="text-muted mb-0">Suivez votre progression vers vos objectifs</p>
+    <h1>Certifications</h1>
+    <p>Suivez votre progression vers vos objectifs professionnels</p>
   </div>
   <a href="{{ url_for('tracker.ajouter') }}" class="btn btn-primary">
-    ➕ Ajouter une certification
+    <i data-lucide="plus"></i>
+    Ajouter
   </a>
 </div>
 
-<!-- Messages flash -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<!-- ── Statistiques ──────────────────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm">
-      <div class="card-body py-3">
-        <div class="display-6 fw-bold text-primary">{{ stats.total }}</div>
-        <div class="small text-muted">Total</div>
-      </div>
+<!-- Stats -->
+<div class="stat-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Total</span>
+      <i data-lucide="layers" class="stat-icon" style="color:var(--text-muted)"></i>
     </div>
+    <div class="stat-value">{{ stats.total }}</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm bg-success bg-opacity-10">
-      <div class="card-body py-3">
-        <div class="display-6 fw-bold text-success">{{ stats.validees }}</div>
-        <div class="small text-muted">Validées</div>
-      </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Validées</span>
+      <i data-lucide="check-circle" class="stat-icon text-success"></i>
     </div>
+    <div class="stat-value text-success">{{ stats.validees }}</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm bg-warning bg-opacity-10">
-      <div class="card-body py-3">
-        <div class="display-6 fw-bold text-warning">{{ stats.en_cours }}</div>
-        <div class="small text-muted">En cours</div>
-      </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">En cours</span>
+      <i data-lucide="loader" class="stat-icon text-warning"></i>
     </div>
+    <div class="stat-value text-warning">{{ stats.en_cours }}</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm bg-secondary bg-opacity-10">
-      <div class="card-body py-3">
-        <div class="display-6 fw-bold text-secondary">{{ stats.a_faire }}</div>
-        <div class="small text-muted">À faire</div>
-      </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">À faire</span>
+      <i data-lucide="clock" class="stat-icon" style="color:var(--text-secondary)"></i>
     </div>
+    <div class="stat-value">{{ stats.a_faire }}</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm bg-info bg-opacity-10">
-      <div class="card-body py-3">
-        <div class="display-6 fw-bold text-info">{{ stats.gratuites }}</div>
-        <div class="small text-muted">Gratuites</div>
-      </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Gratuites</span>
+      <i data-lucide="gift" class="stat-icon text-success"></i>
     </div>
-  </div>
-  <div class="col-6 col-md-2">
-    <div class="card text-center border-0 shadow-sm bg-primary bg-opacity-10">
-      <div class="card-body py-3">
-        {% if stats.total > 0 %}
-          <div class="display-6 fw-bold text-primary">
-            {{ ((stats.validees / stats.total) * 100) | int }}%
-          </div>
-        {% else %}
-          <div class="display-6 fw-bold text-primary">0%</div>
-        {% endif %}
-        <div class="small text-muted">Complétées</div>
-      </div>
-    </div>
+    <div class="stat-value text-success">{{ stats.gratuites }}</div>
   </div>
 </div>
 
-<!-- ── Liste des certifications ──────────────────────────────────────────── -->
+<!-- Liste -->
 {% if certifications %}
   {% for cert in certifications %}
-  <div class="card mb-3 shadow-sm
-    {% if cert.statut == 'Validée' %}border-success
-    {% elif cert.statut == 'En cours' %}border-warning
-    {% else %}border-0{% endif %}">
-    <div class="card-body">
-      <div class="row align-items-center">
+  <div class="cert-card
+    {% if cert.statut == 'Validée' %}status-done
+    {% elif cert.statut == 'En cours' %}status-wip
+    {% else %}status-todo{% endif %}">
 
-        <!-- Infos principales -->
-        <div class="col-md-4">
-          <div class="d-flex align-items-center gap-2">
-            <!-- Badge statut -->
-            {% if cert.statut == 'Validée' %}
-              <span class="badge bg-success">✅ Validée</span>
-            {% elif cert.statut == 'En cours' %}
-              <span class="badge bg-warning text-dark">🔄 En cours</span>
-            {% else %}
-              <span class="badge bg-secondary">📋 À faire</span>
-            {% endif %}
+    <!-- Infos -->
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        {% if cert.statut == 'Validée' %}
+          <span class="badge badge-success">
+            <i data-lucide="check"></i> Validée
+          </span>
+        {% elif cert.statut == 'En cours' %}
+          <span class="badge badge-warning">
+            <i data-lucide="loader"></i> En cours
+          </span>
+        {% else %}
+          <span class="badge badge-muted">
+            <i data-lucide="clock"></i> À faire
+          </span>
+        {% endif %}
 
-            {% if cert.gratuite %}
-              <span class="badge bg-info text-dark">GRATUIT</span>
-            {% endif %}
-          </div>
-          <h5 class="mt-2 mb-1">{{ cert.nom }}</h5>
-          <div class="text-muted small">
-            🏢 {{ cert.organisme }} &nbsp;|&nbsp; 🏷️ {{ cert.categorie }}
-          </div>
-        </div>
+        {% if cert.gratuite %}
+          <span class="badge badge-free">Gratuit</span>
+        {% else %}
+          <span class="badge badge-paid">Payant</span>
+        {% endif %}
 
-        <!-- Progression -->
-        <div class="col-md-4">
-          <div class="small text-muted mb-1">
-            Progression : niveau {{ cert.niveau }} → {{ cert.niveau_vise }}
-          </div>
-          <div class="progress" style="height: 20px;">
-            <div class="progress-bar
-              {% if cert.progression() == 100 %}bg-success
-              {% elif cert.progression() >= 60 %}bg-warning
-              {% else %}bg-primary{% endif %}"
-              style="width: {{ cert.progression() }}%">
-              {{ cert.progression() }}%
-            </div>
-          </div>
-          <div class="d-flex justify-content-between mt-1">
-            {% for i in range(1, 6) %}
-              <span class="small
-                {% if i <= cert.niveau %}text-primary fw-bold
-                {% else %}text-muted{% endif %}">
-                {{ i }}
+        {% if cert.deadline %}
+          {% set jours = cert.jours_restants() %}
+          {% if jours is not none %}
+            {% if jours < 0 %}
+              <span class="badge badge-danger">
+                <i data-lucide="alert-circle"></i>
+                Dépassée {{ jours|abs }}j
               </span>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Deadline + actions -->
-        <div class="col-md-4 text-end">
-          {% if cert.deadline %}
-            {% set jours = cert.jours_restants() %}
-            {% if jours is not none %}
-              {% if jours < 0 %}
-                <div class="badge bg-danger mb-2">
-                  ⚠️ Dépassée de {{ jours | abs }} jours
-                </div>
-              {% elif jours == 0 %}
-                <div class="badge bg-danger mb-2">⚠️ Aujourd'hui !</div>
-              {% elif jours <= 7 %}
-                <div class="badge bg-warning text-dark mb-2">
-                  ⏰ {{ jours }} jours restants
-                </div>
-              {% elif jours <= 30 %}
-                <div class="badge bg-info text-dark mb-2">
-                  📅 {{ jours }} jours restants
-                </div>
-              {% else %}
-                <div class="badge bg-light text-dark mb-2">
-                  📅 {{ cert.deadline.strftime('%d/%m/%Y') }}
-                </div>
-              {% endif %}
+            {% elif jours <= 7 %}
+              <span class="badge badge-danger">
+                <i data-lucide="alarm-clock"></i>
+                {{ jours }}j restants
+              </span>
+            {% elif jours <= 30 %}
+              <span class="badge badge-warning">
+                <i data-lucide="calendar"></i>
+                {{ jours }}j restants
+              </span>
+            {% else %}
+              <span class="badge badge-muted">
+                <i data-lucide="calendar"></i>
+                {{ cert.deadline.strftime('%d/%m/%Y') }}
+              </span>
             {% endif %}
-          {% else %}
-            <div class="text-muted small mb-2">Pas de deadline</div>
           {% endif %}
+        {% endif %}
+      </div>
 
-          <div class="d-flex gap-2 justify-content-end">
-            <!-- Changement statut rapide -->
-            <form action="{{ url_for('tracker.changer_statut', id=cert.id) }}"
-                  method="POST">
-              <select name="statut" class="form-select form-select-sm"
-                      onchange="this.form.submit()" style="width: auto;">
-                <option {% if cert.statut=='A faire' %}selected{% endif %}>A faire</option>
-                <option {% if cert.statut=='En cours' %}selected{% endif %}>En cours</option>
-                <option {% if cert.statut=='Validée' %}selected{% endif %}>Validée</option>
-              </select>
-            </form>
+      <div class="cert-name">{{ cert.nom }}</div>
 
-            <a href="{{ url_for('tracker.ressources', id=cert.id) }}"
-   class="btn btn-sm btn-outline-warning">
-  📚 Ressources
-</a>
+      <div class="cert-meta">
+        <span class="cert-meta-item">
+          <i data-lucide="building-2"></i>
+          {{ cert.organisme }}
+        </span>
+        <span class="cert-meta-item">
+          <i data-lucide="tag"></i>
+          {{ cert.categorie }}
+        </span>
+        {% if cert.notes %}
+        <span class="cert-meta-item">
+          <i data-lucide="file-text"></i>
+          {{ cert.notes[:60] }}{% if cert.notes|length > 60 %}…{% endif %}
+        </span>
+        {% endif %}
+      </div>
 
-            <a href="{{ url_for('tracker.modifier', id=cert.id) }}"
-               class="btn btn-sm btn-outline-primary">✏️</a>
-
-            <form action="{{ url_for('tracker.supprimer', id=cert.id) }}"
-                  method="POST"
-                  onsubmit="return confirm('Supprimer cette certification ?')">
-              <button class="btn btn-sm btn-outline-danger">🗑️</button>
-            </form>
-          </div>
+      <!-- Progression -->
+      <div class="mb-1 flex items-center justify-between">
+        <span class="text-xs text-secondary">
+          Niveau {{ cert.niveau }} / {{ cert.niveau_vise }}
+        </span>
+        <span class="text-xs font-mono text-accent">
+          {{ cert.progression() }}%
+        </span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill
+          {% if cert.progression() == 100 %}success
+          {% elif cert.progression() >= 60 %}warning{% endif %}"
+          style="width:{{ cert.progression() }}%">
         </div>
-
       </div>
-
-      <!-- Notes -->
-      {% if cert.notes %}
-      <div class="mt-2 pt-2 border-top">
-        <small class="text-muted">📝 {{ cert.notes }}</small>
-      </div>
-      {% endif %}
-
     </div>
+
+    <!-- Actions -->
+    <div class="cert-actions">
+      <!-- Statut rapide -->
+      <form action="{{ url_for('tracker.changer_statut', id=cert.id) }}"
+            method="POST">
+        <select name="statut" class="form-control"
+                style="width:auto;font-size:12px;padding:5px 28px 5px 10px"
+                onchange="this.form.submit()">
+          <option {% if cert.statut=='A faire'  %}selected{% endif %}>A faire</option>
+          <option {% if cert.statut=='En cours' %}selected{% endif %}>En cours</option>
+          <option {% if cert.statut=='Validée'  %}selected{% endif %}>Validée</option>
+        </select>
+      </form>
+
+      <a href="{{ url_for('tracker.ressources', id=cert.id) }}"
+         class="btn btn-warning btn-sm">
+        <i data-lucide="book-open"></i>
+        Ressources
+      </a>
+
+      <a href="{{ url_for('tracker.modifier', id=cert.id) }}"
+         class="btn btn-secondary btn-sm">
+        <i data-lucide="pencil"></i>
+      </a>
+
+      <form action="{{ url_for('tracker.supprimer', id=cert.id) }}"
+            method="POST"
+            onsubmit="return confirm('Supprimer cette certification ?')">
+        <button class="btn btn-danger btn-sm">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </form>
+    </div>
+
   </div>
   {% endfor %}
 
 {% else %}
-  <div class="text-center py-5">
-    <div style="font-size: 4rem;">🎯</div>
-    <h4 class="mt-3">Aucune certification pour l'instant</h4>
-    <p class="text-muted">Commence par ajouter tes certifications visées</p>
-    <a href="{{ url_for('tracker.ajouter') }}" class="btn btn-primary btn-lg">
-      ➕ Ajouter ma première certification
+  <div style="text-align:center;padding:64px 20px;">
+    <i data-lucide="award"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary" style="margin-bottom:16px">
+      Aucune certification ajoutée
+    </p>
+    <a href="{{ url_for('tracker.ajouter') }}" class="btn btn-primary">
+      <i data-lucide="plus"></i>
+      Ajouter ma première certification
     </a>
   </div>
 {% endif %}

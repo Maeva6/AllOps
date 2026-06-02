@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Révision IA{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Révision IA</h1>
+    <p>Charge un cours ou saisis un sujet — l'IA génère un cours et un quiz personnalisés</p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start">
+
+  <!-- ── Formulaire principal ──────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <i data-lucide="sparkles" class="header-icon"></i>
+      Nouvelle session de révision
+    </div>
+    <div class="card-body">
+      <form action="{{ url_for('revision.generer') }}"
+            method="POST" enctype="multipart/form-data"
+            id="formRevision">
+
+        <div class="form-group">
+          <label class="form-label">Titre / Sujet du cours *</label>
+          <input type="text" name="titre" class="form-control"
+                 style="font-size:15px"
+                 placeholder="ex: Les pointeurs en C, La loi d'Ohm, Docker Compose…"
+                 required>
+          <div class="form-hint">
+            Sois précis : "Les variables en Python" plutôt que "Python"
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Domaine</label>
+          <select name="domaine" class="form-control">
+            {% for key, label in domaines.items() %}
+            <option value="{{ key }}">
+              {{ label | capitalize }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Fichier de cours (optionnel)
+          </label>
+          <div id="dropZone" style="
+            border:2px dashed var(--border-light);
+            border-radius:var(--radius);
+            padding:24px;
+            text-align:center;
+            cursor:pointer;
+            transition:all 0.2s;
+            background:var(--bg-elevated)">
+            <i data-lucide="upload-cloud"
+               style="width:32px;height:32px;color:var(--text-muted);
+                      margin:0 auto 8px;display:block;stroke-width:1.5"></i>
+            <div style="font-size:13px;color:var(--text-secondary)">
+              Glisse un fichier ici ou
+              <label for="fichier"
+                     style="color:var(--accent);cursor:pointer;font-weight:500">
+                clique pour parcourir
+              </label>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+              PDF, TXT ou Markdown — max 10 Mo
+            </div>
+            <input type="file" id="fichier" name="fichier"
+                   accept=".pdf,.txt,.md"
+                   style="display:none"
+                   onchange="onFileSelected(this)">
+          </div>
+          <div id="fileInfo" style="display:none;margin-top:8px">
+            <div style="display:flex;align-items:center;gap:8px;
+                        background:var(--bg-elevated);
+                        border:1px solid var(--border);
+                        border-radius:var(--radius-sm);padding:10px 14px">
+              <i data-lucide="file-text"
+                 style="width:16px;height:16px;color:var(--accent)"></i>
+              <span id="fileName"
+                    style="font-size:13px;flex:1;color:var(--text-primary)">
+              </span>
+              <button type="button" class="btn btn-ghost btn-icon"
+                      onclick="clearFile()">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bouton submit -->
+        <button type="submit" class="btn btn-primary w-full"
+                id="btnGenerer" style="padding:12px">
+          <i data-lucide="sparkles"></i>
+          Générer le cours avec l'IA
+        </button>
+
+        <!-- Loading state -->
+        <div id="loadingState"
+             style="display:none;text-align:center;padding:20px">
+          <div style="
+            width:40px;height:40px;margin:0 auto 12px;
+            border:3px solid var(--border);
+            border-top-color:var(--accent);
+            border-radius:50%;
+            animation:spin 0.8s linear infinite">
+          </div>
+          <div style="font-size:13px;color:var(--text-secondary)">
+            L'IA génère votre cours…
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            Cela prend environ 10-20 secondes
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Explications + historique ─────────────────────────────────────────── -->
+  <div>
+    <!-- Comment ça marche -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <i data-lucide="info" class="header-icon"></i>
+        Comment ça marche
+      </div>
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;flex-direction:column;gap:14px">
+
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;
+                        background:var(--accent-glow);border:1px solid var(--accent-dim);
+                        display:flex;align-items:center;justify-content:center;
+                        flex-shrink:0;font-size:12px;font-weight:700;color:var(--accent)">
+              1
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">
+                Saisis le sujet
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">
+                Titre du cours et domaine. Tu peux aussi uploader un PDF ou TXT.
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;
+                        background:var(--success-dim);
+                        display:flex;align-items:center;justify-content:center;
+                        flex-shrink:0;font-size:12px;font-weight:700;color:var(--success)">
+              2
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">
+                Groq génère le cours
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">
+                Llama3-70b crée un cours structuré avec exemples et résumé.
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;
+                        background:var(--warning-dim);
+                        display:flex;align-items:center;justify-content:center;
+                        flex-shrink:0;font-size:12px;font-weight:700;color:var(--warning)">
+              3
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">
+                Choisis ton niveau de quiz
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">
+                De 1 (facile) à 10 (expert). Gemini génère le quiz adapté.
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;
+                        background:var(--danger-dim);
+                        display:flex;align-items:center;justify-content:center;
+                        flex-shrink:0;font-size:12px;font-weight:700;color:var(--danger)">
+              4
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">
+                Révise et teste-toi
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">
+                Quiz interactif avec corrections et explications détaillées.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique -->
+    {% if sessions %}
+    <div class="card">
+      <div class="card-header">
+        <i data-lucide="history" class="header-icon"></i>
+        Sessions récentes
+      </div>
+      <div style="padding:0">
+        {% for s in sessions %}
+        <div style="
+          display:flex;align-items:center;gap:12px;
+          padding:12px 16px;
+          border-bottom:1px solid var(--border);
+          {% if loop.last %}border-bottom:none{% endif %}">
+
+          <div style="
+            width:36px;height:36px;border-radius:var(--radius-sm);
+            background:var(--accent-glow);
+            display:flex;align-items:center;justify-content:center;
+            flex-shrink:0">
+            <i data-lucide="book-open"
+               style="width:16px;height:16px;color:var(--accent)"></i>
+          </div>
+
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;
+                        color:var(--text-primary);
+                        white-space:nowrap;overflow:hidden;
+                        text-overflow:ellipsis">
+              {{ s.titre }}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              {{ s.domaine }} ·
+              {{ s.created_at.strftime('%d/%m %H:%M') }}
+            </div>
+          </div>
+
+          <div style="display:flex;gap:6px">
+            <a href="{{ url_for('revision.voir_cours', id=s.id) }}"
+               class="btn btn-secondary btn-sm">
+              <i data-lucide="eye"></i>
+            </a>
+            <form action="{{ url_for('revision.supprimer', id=s.id) }}"
+                  method="POST">
+              <button class="btn btn-danger btn-sm"
+                      onclick="return confirm('Supprimer ?')">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+#dropZone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+</style>
+<script>
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+});
+dropZone.addEventListener('click', () => {
+  document.getElementById('fichier').click();
+});
+
+function onFileSelected(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(file) {
+  const allowed = ['.pdf', '.txt', '.md'];
+  const ext     = '.' + file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    alert('Format non supporté. Utilise PDF, TXT ou Markdown.');
+    return;
+  }
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileInfo').style.display = 'block';
+  dropZone.style.display = 'none';
+  lucide.createIcons();
+}
+
+function clearFile() {
+  document.getElementById('fichier').value = '';
+  document.getElementById('fileInfo').style.display = 'none';
+  dropZone.style.display = 'block';
+}
+
+// ── Loading state au submit ───────────────────────────────────────────────────
+document.getElementById('formRevision').addEventListener('submit', () => {
+  document.getElementById('btnGenerer').style.display   = 'none';
+  document.getElementById('loadingState').style.display = 'block';
+});
+</script>
+{% endblock %}

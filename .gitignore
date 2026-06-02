@@ -9,3 +9,4 @@ ENV/
 instance/allops.db
 *.env
 .DS_Store
+.env.example

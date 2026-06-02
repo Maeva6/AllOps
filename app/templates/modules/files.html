@@ -1,377 +1,405 @@
 {% extends "base.html" %}
+{% block breadcrumb %}Fichiers{% endblock %}
 
 {% block content %}
-<!-- <div class="row mb-4">
-  <div class="col">
-    <h2>📁 Gestion des Fichiers</h2>
-    <p class="text-muted">Automatisez vos tâches répétitives sur les fichiers</p>
-  </div>
-</div> -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+
+<div class="page-header flex items-center justify-between">
   <div>
-    <h2>📁 Gestion des Fichiers</h2>
-    <p class="text-muted mb-0">Automatisez vos tâches répétitives</p>
+    <h1>Gestion des fichiers</h1>
+    <p>Automatisez vos tâches répétitives sur les fichiers</p>
   </div>
-  <a href="{{ url_for('files.historique') }}" class="btn btn-outline-secondary">
-    🕘 Historique des organisations
+  <a href="{{ url_for('files.historique') }}" class="btn btn-secondary">
+    <i data-lucide="history"></i>
+    Historique
   </a>
 </div>
 
-<!-- Messages flash -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<!-- ── Modal Explorateur ──────────────────────────────────────────────────── -->
-<div class="modal fade" id="explorateurModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-dark text-white">
-        <h5 class="modal-title">📂 Choisir un dossier</h5>
-        <button type="button" class="btn-close btn-close-white"
-                data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-
-        <!-- Barre de navigation -->
-        <div class="d-flex align-items-center gap-2 mb-3">
-          <button class="btn btn-sm btn-outline-secondary" id="btnParent">
-            ⬆️ Dossier parent
-          </button>
-          <code class="flex-grow-1 bg-light p-2 rounded" id="cheminActuel">
-            /home/maeva
-          </code>
-        </div>
-
-        <!-- Liste des fichiers/dossiers -->
-        <div class="border rounded" style="height: 350px; overflow-y: auto;">
-          <div id="listeExplorateur" class="list-group list-group-flush">
-            <div class="text-center p-3 text-muted">Chargement...</div>
-          </div>
-        </div>
-
-      </div>
-      <div class="modal-footer">
-        <span class="text-muted small me-auto">
-          Dossier sélectionné :
-          <strong id="dossierSelectionne">/home/maeva</strong>
-        </span>
-        <button type="button" class="btn btn-secondary"
-                data-bs-dismiss="modal">Annuler</button>
-        <button type="button" class="btn btn-primary"
-                id="btnConfirmerDossier">✅ Choisir ce dossier</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── 3 cartes d'opérations ─────────────────────────────────────────────── -->
-<div class="row g-4">
+<!-- ── 3 modules ──────────────────────────────────────────────────────────── -->
+<div class="op-grid">
 
   <!-- Renommage -->
-  <div class="col-md-4">
-    <div class="card h-100 shadow-sm">
-      <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">📝 Renommage en masse</h5>
+  <div class="op-card">
+    <div class="op-card-header">
+      <div class="op-card-icon" style="background:var(--accent-glow);">
+        <i data-lucide="pencil" style="color:var(--accent)"></i>
       </div>
-      <div class="card-body">
-        <p class="text-muted small">
-          Renomme tous les fichiers d'un dossier :
-          <code>prefixe_2026-03-24_01.ext</code>
-        </p>
-        <form action="{{ url_for('files.renommer') }}" method="POST">
-          <div class="mb-2">
-            <label class="form-label fw-bold">Dossier</label>
-            <div class="input-group">
-              <input type="text" name="dossier" id="dossier_rename"
-                     class="form-control" placeholder="/home/maeva/cours" required>
-              <button type="button" class="btn btn-outline-secondary"
-                      onclick="ouvrirExplorateur('dossier_rename')">
-                📂
-              </button>
-            </div>
+      <div>
+        <div class="op-card-title">Renommage en masse</div>
+        <div class="op-card-subtitle">Pattern : préfixe_date_01.ext</div>
+      </div>
+    </div>
+    <div class="op-card-body">
+      <form action="{{ url_for('files.renommer') }}" method="POST">
+        <div class="form-group">
+          <label class="form-label">Dossier</label>
+          <div class="input-group">
+            <input type="text" name="dossier" id="dossier_rename"
+                   class="form-control mono"
+                   placeholder="/home/maeva/cours" required>
+            <button type="button" class="btn btn-secondary btn-icon"
+                    onclick="ouvrirExplorateur('dossier_rename')">
+              <i data-lucide="folder-open"></i>
+            </button>
           </div>
-          <div class="mb-2">
-            <label class="form-label fw-bold">Préfixe</label>
-            <input type="text" name="prefixe" class="form-control"
-                   placeholder="TP_Algo" required>
-          </div>
-          <div class="mb-2">
-            <label class="form-label fw-bold">Suffixe (optionnel)</label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Préfixe</label>
+          <input type="text" name="prefixe" class="form-control"
+                 placeholder="TP_Algo" required>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Suffixe (optionnel)</label>
             <input type="text" name="suffixe" class="form-control"
                    placeholder="_final">
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Filtrer extension</label>
+          <div class="form-group">
+            <label class="form-label">Extension (optionnel)</label>
             <input type="text" name="extension" class="form-control"
-                   placeholder=".pdf  (vide = tous)">
-          </div>
-          <button type="submit" class="btn btn-primary w-100">
-            🚀 Renommer
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Fusion PDF -->
-  <div class="col-md-4">
-    <div class="card h-100 shadow-sm">
-      <div class="card-header bg-danger text-white">
-        <h5 class="mb-0">📄 Fusion de PDFs</h5>
-      </div>
-      <div class="card-body">
-        <p class="text-muted small">
-          Fusionne tous les PDFs d'un dossier en un seul fichier.
-        </p>
-        <form action="{{ url_for('files.fusionner_pdf') }}" method="POST">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Dossier des PDFs</label>
-            <div class="input-group">
-              <input type="text" name="dossier_pdf" id="dossier_pdf"
-                     class="form-control"
-                     placeholder="/home/maeva/cours/rapports" required>
-              <button type="button" class="btn btn-outline-secondary"
-                      onclick="ouvrirExplorateur('dossier_pdf')">
-                📂
-              </button>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold">Nom du fichier de sortie</label>
-            <input type="text" name="nom_sortie" class="form-control"
-                   placeholder="rapport_final" required>
-            <div class="form-text">.pdf ajouté automatiquement</div>
-          </div>
-          <button type="submit" class="btn btn-danger w-100">
-            🔗 Fusionner les PDFs
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-<!-- ── Organisation automatique ────────────────────────────────────────── -->
-<div class="col-md-4">
-  <div class="card h-100 shadow-sm">
-    <div class="card-header bg-success text-white">
-      <h5 class="mb-0">📂 Organisation automatique</h5>
-    </div>
-    <div class="card-body">
-      <p class="text-muted small">Range les fichiers par catégorie.</p>
-
-      <form id="formOrganiser"
-            action="{{ url_for('files.organiser') }}" method="POST">
-        <div class="mb-3">
-          <label class="form-label fw-bold">Dossier à organiser</label>
-          <div class="input-group">
-            <input type="text" name="dossier_org" id="dossier_org"
-                   class="form-control"
-                   placeholder="/home/maeva/Téléchargements" required>
-            <button type="button" class="btn btn-outline-secondary"
-                    onclick="ouvrirExplorateur('dossier_org')">📂</button>
+                   placeholder=".pdf">
           </div>
         </div>
-
-        <!-- Aperçu avant organisation -->
-        <button type="button" class="btn btn-outline-success w-100 mb-2"
-                onclick="afficherApercu()">
-          🔍 Aperçu avant organisation
-        </button>
-
-        <!-- Zone aperçu -->
-        <div id="zoneApercu" class="d-none mb-3">
-          <div id="contenuApercu"
-               class="border rounded p-2 bg-light"
-               style="max-height: 200px; overflow-y: auto; font-size: 0.8rem;">
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-success w-100">
-          ✨ Organiser
+        <button type="submit" class="btn btn-primary w-full">
+          <i data-lucide="play"></i>
+          Renommer
         </button>
       </form>
     </div>
   </div>
-</div>
 
-<!-- ── Historique ─────────────────────────────────────────────────────────── -->
-{% if operations %}
-<div class="row mt-5">
-  <div class="col">
-    <h4>🕘 Dernières opérations</h4>
-    <div class="table-responsive">
-      <table class="table table-striped table-hover">
-        <thead class="table-dark">
-          <tr>
-            <th>Type</th><th>Fichiers</th>
-            <th>Détails</th><th>Statut</th><th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for op in operations %}
-          <tr>
-            <td>
-              {% if op.type_op == 'rename' %}📝 Renommage
-              {% elif op.type_op == 'merge_pdf' %}📄 Fusion PDF
-              {% elif op.type_op == 'organize' %}📂 Organisation
-              {% else %}{{ op.type_op }}{% endif %}
-            </td>
-            <td><span class="badge bg-secondary">{{ op.nb_fichiers }}</span></td>
-            <td class="small text-muted">{{ op.details }}</td>
-            <td>
-              {% if op.statut == 'success' %}
-                <span class="badge bg-success">✅ Succès</span>
-              {% else %}
-                <span class="badge bg-danger">❌ Erreur</span>
-              {% endif %}
-            </td>
-            <td class="small">
-              {{ op.created_at.strftime('%d/%m/%Y %H:%M') }}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <!-- Fusion PDF -->
+  <div class="op-card">
+    <div class="op-card-header">
+      <div class="op-card-icon" style="background:var(--danger-dim);">
+        <i data-lucide="file-text" style="color:var(--danger)"></i>
+      </div>
+      <div>
+        <div class="op-card-title">Fusion de PDFs</div>
+        <div class="op-card-subtitle">Combine plusieurs PDFs en un seul</div>
+      </div>
+    </div>
+    <div class="op-card-body">
+      <form action="{{ url_for('files.fusionner_pdf') }}" method="POST">
+        <div class="form-group">
+          <label class="form-label">Dossier contenant les PDFs</label>
+          <div class="input-group">
+            <input type="text" name="dossier_pdf" id="dossier_pdf"
+                   class="form-control mono"
+                   placeholder="/home/maeva/rapports" required>
+            <button type="button" class="btn btn-secondary btn-icon"
+                    onclick="ouvrirExplorateur('dossier_pdf')">
+              <i data-lucide="folder-open"></i>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom du fichier de sortie</label>
+          <input type="text" name="nom_sortie" class="form-control"
+                 placeholder="rapport_final" required>
+          <div class="form-hint">L'extension .pdf sera ajoutée automatiquement</div>
+        </div>
+        <div style="margin-top:auto;padding-top:36px">
+        <button type="submit" class="btn btn-danger w-full mt-3">
+          <i data-lucide="git-merge"></i>
+          Fusionner
+        </button>
+        </div>
+      </form>
     </div>
   </div>
+
+  <!-- Organisation -->
+  <div class="op-card">
+    <div class="op-card-header">
+      <div class="op-card-icon" style="background:var(--success-dim);">
+        <i data-lucide="folders" style="color:var(--success)"></i>
+      </div>
+      <div>
+        <div class="op-card-title">Organisation automatique</div>
+        <div class="op-card-subtitle">Classe par type : Images, Docs, Code…</div>
+      </div>
+    </div>
+    <div class="op-card-body">
+      <form id="formOrganiser"
+            action="{{ url_for('files.organiser') }}" method="POST">
+        <div class="form-group">
+          <label class="form-label">Dossier à organiser</label>
+          <div class="input-group">
+            <input type="text" name="dossier_org" id="dossier_org"
+                   class="form-control mono"
+                   placeholder="/home/maeva/Téléchargements" required>
+            <button type="button" class="btn btn-secondary btn-icon"
+                    onclick="ouvrirExplorateur('dossier_org')">
+              <i data-lucide="folder-open"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Aperçu -->
+        <button type="button" class="btn btn-secondary w-full mb-2"
+                onclick="afficherApercu()">
+          <i data-lucide="eye"></i>
+          Aperçu avant organisation
+        </button>
+
+        <div id="zoneApercu" class="hidden mb-3">
+          <div id="contenuApercu" class="preview-box"></div>
+        </div>
+        <div style="margin-top:auto;padding-top:110px">
+        <button type="submit" class="btn btn-success w-full">
+          <i data-lucide="sparkles"></i>
+          Organiser
+        </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Historique des opérations ──────────────────────────────────────────── -->
+{% if operations %}
+<div class="section-label mt-4">Opérations récentes</div>
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Fichiers</th>
+        <th>Détails</th>
+        <th>Statut</th>
+        <th>Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for op in operations %}
+      <tr>
+        <td>
+          <div class="flex items-center gap-2">
+            {% if op.type_op == 'rename' %}
+              <i data-lucide="pencil"
+                 style="width:13px;height:13px;color:var(--accent)"></i>
+              Renommage
+            {% elif op.type_op == 'merge_pdf' %}
+              <i data-lucide="file-text"
+                 style="width:13px;height:13px;color:var(--danger)"></i>
+              Fusion PDF
+            {% elif op.type_op == 'organize' %}
+              <i data-lucide="folders"
+                 style="width:13px;height:13px;color:var(--success)"></i>
+              Organisation
+            {% endif %}
+          </div>
+        </td>
+        <td class="mono">{{ op.nb_fichiers }}</td>
+        <td class="muted text-sm">{{ op.details[:60] }}{% if op.details|length > 60 %}…{% endif %}</td>
+        <td>
+          {% if op.annule %}
+            <span class="badge badge-muted">
+              <i data-lucide="corner-up-left"></i> Annulée
+            </span>
+          {% else %}
+            <span class="badge badge-success">
+              <i data-lucide="check"></i> OK
+            </span>
+          {% endif %}
+        </td>
+        <td class="mono text-xs muted">
+          {{ op.created_at.strftime('%d/%m %H:%M') }}
+        </td>
+        <td>
+          {% if not op.annule and op.rollback_data %}
+            <a href="{{ url_for('files.rollback', id=op.id) }}"
+               class="btn btn-warning btn-sm"
+               onclick="return confirm('Annuler cette action ?')">
+              <i data-lucide="corner-up-left"></i>
+              Annuler
+            </a>
+          {% else %}
+            <span class="text-muted text-xs">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endif %}
 
-<!-- ── JavaScript Explorateur ────────────────────────────────────────────── -->
-<script>
-let champCible = '';
-let cheminActuel = '/home/maeva';
+<!-- ── Modal explorateur ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="explorateurModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">
+        <i data-lucide="folder-open"></i>
+        Choisir un dossier
+      </div>
+      <button class="btn btn-ghost btn-icon" onclick="fermerExplorateur()">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="explorer-nav">
+        <button class="btn btn-secondary btn-sm" id="btnParent">
+          <i data-lucide="arrow-up"></i>
+          Parent
+        </button>
+        <div class="explorer-path" id="cheminActuel">/home/maeva</div>
+      </div>
+      <div class="explorer-shortcuts" id="explorerShortcuts"></div>
+      <div class="explorer-list" id="listeExplorateur">
+        <div style="padding:20px;text-align:center;color:var(--text-muted)">
+          Chargement…
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-info">
+        Sélectionné : <span id="dossierSelectionne"
+                            style="color:var(--accent)">/home/maeva</span>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary" onclick="fermerExplorateur()">
+          Annuler
+        </button>
+        <button class="btn btn-primary" id="btnConfirmerDossier">
+          <i data-lucide="check"></i>
+          Choisir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+let champCible  = '';
+let cheminActuel = '/mnt/c/Users/gaps6/Desktop';
+
+/* ── Explorateur ─────────────────────────────────────────────────────────── */
 function ouvrirExplorateur(champId) {
   champCible = champId;
-  const valActuelle = document.getElementById(champId).value;
-  chargerDossier(valActuelle || '/mnt/c/Users/gaps6/Desktop');
-  new bootstrap.Modal(document.getElementById('explorateurModal')).show();
+  const val = document.getElementById(champId).value;
+  chargerDossier(val || '/mnt/c/Users/gaps6/Desktop');
+  document.getElementById('explorateurModal').classList.add('open');
+}
+
+function fermerExplorateur() {
+  document.getElementById('explorateurModal').classList.remove('open');
 }
 
 function chargerDossier(chemin) {
   cheminActuel = chemin;
-  document.getElementById('cheminActuel').textContent = chemin;
+  document.getElementById('cheminActuel').textContent    = chemin;
   document.getElementById('dossierSelectionne').textContent = chemin;
-  document.getElementById('listeExplorateur').innerHTML =
-    '<div class="text-center p-3 text-muted">⏳ Chargement...</div>';
+  document.getElementById('listeExplorateur').innerHTML  =
+    '<div style="padding:20px;text-align:center;color:var(--text-muted)">Chargement…</div>';
 
   fetch(`/files/explorer?chemin=${encodeURIComponent(chemin)}`)
     .then(r => r.json())
     .then(data => {
       if (data.erreur) {
         document.getElementById('listeExplorateur').innerHTML =
-          `<div class="p-3 text-danger">❌ ${data.erreur}</div>`;
+          `<div style="padding:16px;color:var(--danger)">${data.erreur}</div>`;
         return;
       }
 
-      // ── Raccourcis ────────────────────────────────────────────────────────
-      let html = '<div class="p-2 bg-light border-bottom">';
-      html += '<small class="text-muted fw-bold ms-1">RACCOURCIS RAPIDES</small>';
-      html += '<div class="d-flex flex-wrap gap-1 mt-1">';
-      (data.raccourcis || []).forEach(r => {
-        const actif = r.chemin === cheminActuel ? 'btn-primary' : 'btn-outline-secondary';
-        html += `<button type="button" class="btn btn-sm ${actif}"
-                   onclick="chargerDossier('${r.chemin}')">
-                   ${r.nom}
-                 </button>`;
-      });
-      html += '</div></div>';
+      /* Shortcuts */
+      const sc = document.getElementById('explorerShortcuts');
+      sc.innerHTML = (data.raccourcis || []).map(r => {
+        const active = r.chemin === cheminActuel
+          ? 'background:var(--accent-glow);color:var(--accent);border-color:var(--accent-dim)'
+          : '';
+        return `<button type="button" class="btn btn-secondary btn-sm"
+                  style="${active}" onclick="chargerDossier('${r.chemin}')">
+                  ${r.nom}
+                </button>`;
+      }).join('');
 
-      // ── Contenu du dossier ────────────────────────────────────────────────
+      /* Content */
       const dossiers = data.contenu.filter(e => e.est_dossier);
       const fichiers = data.contenu.filter(e => !e.est_dossier);
-
-      if (data.contenu.length === 0) {
-        html += '<div class="p-3 text-muted text-center">📭 Dossier vide</div>';
-      }
+      let html = '';
 
       dossiers.forEach(item => {
-        html += `
-          <button type="button"
-            class="list-group-item list-group-item-action
-                   d-flex align-items-center gap-2"
-            onclick="chargerDossier('${item.chemin}')">
-            <span>📁</span>
-            <span class="fw-bold">${item.nom}</span>
-            <span class="ms-auto text-muted small">→</span>
-          </button>`;
+        html += `<button type="button" class="explorer-item is-dir"
+                   onclick="chargerDossier('${item.chemin}')">
+                   <i data-lucide="folder" style="color:var(--accent)"></i>
+                   <span class="explorer-item-name">${item.nom}</span>
+                   <i data-lucide="chevron-right"
+                      style="width:12px;height:12px;color:var(--text-muted)"></i>
+                 </button>`;
       });
 
       fichiers.forEach(item => {
         const taille = item.taille != null
           ? (item.taille > 1048576
-              ? (item.taille / 1048576).toFixed(1) + ' MB'
-              : (item.taille / 1024).toFixed(1) + ' KB')
+              ? (item.taille/1048576).toFixed(1)+' MB'
+              : (item.taille/1024).toFixed(1)+' KB')
           : '';
-        html += `
-          <div class="list-group-item d-flex align-items-center gap-2 text-muted">
-            <span>${getIcone(item.nom)}</span>
-            <span>${item.nom}</span>
-            <span class="ms-auto small text-muted">${taille}</span>
-          </div>`;
+        const icon = getIcone(item.nom);
+        html += `<div class="explorer-item">
+                   <i data-lucide="${icon}"></i>
+                   <span class="explorer-item-name">${item.nom}</span>
+                   <span class="explorer-item-size">${taille}</span>
+                 </div>`;
       });
 
+      if (!html) html = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Dossier vide</div>';
+
       document.getElementById('listeExplorateur').innerHTML = html;
+      lucide.createIcons();
     })
     .catch(() => {
       document.getElementById('listeExplorateur').innerHTML =
-        '<div class="p-3 text-danger">❌ Erreur de connexion</div>';
+        '<div style="padding:16px;color:var(--danger)">Erreur de connexion</div>';
     });
 }
 
 function getIcone(nom) {
   const ext = nom.split('.').pop().toLowerCase();
-  const icones = {
-    pdf:'📄', doc:'📝', docx:'📝', txt:'📃', md:'📃',
-    jpg:'🖼️', jpeg:'🖼️', png:'🖼️', gif:'🖼️',
-    mp4:'🎬', avi:'🎬', mkv:'🎬',
-    zip:'🗜️', tar:'🗜️', gz:'🗜️', rar:'🗜️',
-    py:'🐍', js:'⚡', html:'🌐', css:'🎨',
-    xlsx:'📊', csv:'📊', xls:'📊',
-    pptx:'📊', ppt:'📊',
+  const m = {
+    pdf:'file-text', doc:'file-text', docx:'file-text',
+    txt:'file', md:'file',
+    jpg:'image', jpeg:'image', png:'image', gif:'image', svg:'image',
+    mp4:'film', avi:'film', mkv:'film',
+    zip:'archive', tar:'archive', gz:'archive', rar:'archive',
+    py:'code', js:'code', html:'code', css:'code', sh:'terminal',
+    xlsx:'table', csv:'table', xls:'table',
+    pptx:'presentation', ppt:'presentation',
+    mp3:'music', wav:'music',
   };
-  return icones[ext] || '📄';
+  return m[ext] || 'file';
 }
 
-// Bouton parent
 document.getElementById('btnParent').addEventListener('click', () => {
   const parts = cheminActuel.split('/');
   parts.pop();
-  const parent = parts.join('/') || '/home/maeva';
-  chargerDossier(parent);
+  chargerDossier(parts.join('/') || '/home/maeva');
 });
 
-// Confirmer sélection
 document.getElementById('btnConfirmerDossier').addEventListener('click', () => {
-  if (champCible) {
-    document.getElementById(champCible).value = cheminActuel;
-  }
-  bootstrap.Modal.getInstance(
-    document.getElementById('explorateurModal')
-  ).hide();
+  if (champCible) document.getElementById(champCible).value = cheminActuel;
+  fermerExplorateur();
 });
 
-// Aperçu organisation
+/* Fermer sur clic overlay */
+document.getElementById('explorateurModal').addEventListener('click', function(e) {
+  if (e.target === this) fermerExplorateur();
+});
+
+/* ── Aperçu organisation ─────────────────────────────────────────────────── */
 function afficherApercu() {
   const dossier = document.getElementById('dossier_org').value.trim();
-  if (!dossier) {
-    alert('Indique d\'abord un dossier.');
-    return;
-  }
+  if (!dossier) { alert('Indique d\'abord un dossier.'); return; }
 
-  const zone = document.getElementById('zoneApercu');
+  const zone    = document.getElementById('zoneApercu');
   const contenu = document.getElementById('contenuApercu');
-  contenu.innerHTML = '⏳ Analyse en cours...';
-  zone.classList.remove('d-none');
+  contenu.innerHTML = '<span style="color:var(--text-muted)">Analyse…</span>';
+  zone.classList.remove('hidden');
 
   fetch('/files/apercu-organisation', {
     method: 'POST',
@@ -381,27 +409,30 @@ function afficherApercu() {
   .then(r => r.json())
   .then(data => {
     if (data.erreur) {
-      contenu.innerHTML = `<span class="text-danger">❌ ${data.erreur}</span>`;
+      contenu.innerHTML = `<span style="color:var(--danger)">${data.erreur}</span>`;
       return;
     }
 
-    let html = `<div class="mb-2 fw-bold">
-      📊 ${data.total} fichier(s) → ${data.nb_categories} catégorie(s)
-    </div>`;
-
-    const couleurs = {
-      'Images': 'success', 'Documents': 'primary', 'Tableurs': 'info',
-      'Slides': 'warning', 'Archives': 'secondary', 'Code': 'dark',
-      'Videos': 'danger', 'Audio': 'info', 'Autres': 'secondary'
+    const colors = {
+      Images:'var(--accent)', Documents:'var(--info)',
+      Tableurs:'var(--success)', Code:'var(--warning)',
+      Archives:'var(--text-secondary)', Videos:'var(--danger)',
+      Slides:'var(--warning)', Audio:'var(--info)', Autres:'var(--text-muted)'
     };
 
+    let html = `<div style="margin-bottom:10px;font-weight:600;color:var(--text-primary)">
+      ${data.total} fichier(s) → ${data.nb_categories} catégorie(s)
+    </div>`;
+
     for (const [cat, fichiers] of Object.entries(data.apercu)) {
-      const couleur = couleurs[cat] || 'secondary';
-      html += `<div class="mb-1">
-        <span class="badge bg-${couleur}">${cat} (${fichiers.length})</span>
-        <span class="text-muted">
-          ${fichiers.slice(0, 3).map(f => f.nom).join(', ')}
-          ${fichiers.length > 3 ? `... +${fichiers.length - 3}` : ''}
+      const c = colors[cat] || 'var(--text-muted)';
+      html += `<div class="preview-category">
+        <span class="badge" style="background:${c}20;color:${c}">
+          ${cat} · ${fichiers.length}
+        </span>
+        <span class="preview-files">
+          ${fichiers.slice(0,3).map(f=>f.nom).join(', ')}
+          ${fichiers.length > 3 ? ` +${fichiers.length-3}` : ''}
         </span>
       </div>`;
     }
@@ -409,9 +440,8 @@ function afficherApercu() {
     contenu.innerHTML = html;
   })
   .catch(() => {
-    contenu.innerHTML = '<span class="text-danger">❌ Erreur de connexion</span>';
+    contenu.innerHTML = '<span style="color:var(--danger)">Erreur</span>';
   });
 }
 </script>
-
 {% endblock %}

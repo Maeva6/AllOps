@@ -3,7 +3,13 @@ import json
 import re
 from groq import Groq
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    return _client
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -205,7 +211,7 @@ Génère uniquement la bibliographie.
     else:
         return ""
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,

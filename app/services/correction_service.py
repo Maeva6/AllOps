@@ -6,7 +6,13 @@ import subprocess
 import tempfile
 from groq import Groq
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+    return _client
 
 TYPES_DOC = {
     "tp":        "Travail Pratique (TP)",
@@ -213,7 +219,7 @@ Format EXACT (respecte-le scrupuleusement) :
   }}
 ]"""
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
             {
@@ -286,7 +292,7 @@ Génère un paragraphe de synthèse pédagogique (150-200 mots) qui :
 
 Réponds uniquement avec le texte du paragraphe.
 """
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.5,

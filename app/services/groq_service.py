@@ -2,7 +2,13 @@
 import os
 from groq import Groq
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    return _client
 
 # Domaines disponibles avec contexte
 DOMAINES = {
@@ -75,7 +81,7 @@ Utilise le format Markdown avec :
 - > pour les notes importantes
 """
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,

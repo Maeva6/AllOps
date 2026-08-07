@@ -1,6 +1,6 @@
 from flask import Flask
 from app.config import Config
-from app.extensions import db
+from app.extensions import db, migrate
 from app.routes.main import main_bp
 from app.routes.files import files_bp
 from app.routes.tracker import tracker_bp  
@@ -19,6 +19,7 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
     from app.models import Certification, FileOperation, OrganisationSnapshot
 
@@ -35,8 +36,5 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_now():
         return {'now': datetime.now(timezone.utc)}
-
-    with app.app_context():
-        db.create_all()
 
     return app

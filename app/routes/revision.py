@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import SessionRevision, QuizResult
 from app.services.groq_service   import generer_cours,   DOMAINES
 from app.services.gemini_service import generer_quiz,     QUIZ_CONFIG
+from app.services.ai_errors      import IAError
 
 UTC = timezone.utc
 revision_bp = Blueprint('revision', __name__, url_prefix='/revision')
@@ -76,6 +77,9 @@ def generer():
         return redirect(url_for('revision.voir_cours',
                                 id=session_obj.id))
 
+    except IAError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('revision.index'))
     except Exception as e:
         flash(f'Erreur lors de la génération : {str(e)}', 'danger')
         return redirect(url_for('revision.index'))
@@ -169,6 +173,8 @@ def generer_quiz_route(id):
         return jsonify({
             'erreur': 'Erreur de parsing JSON. Réessaie dans quelques secondes.'
         }), 500
+    except IAError as e:
+        return jsonify({'erreur': str(e)}), 503
     except Exception as e:
         return jsonify({'erreur': str(e)}), 500
 

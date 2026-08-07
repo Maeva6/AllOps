@@ -1,14 +1,5 @@
 # app/services/groq_service.py
-import os
-from groq import Groq
-
-_client = None
-
-def get_client():
-    global _client
-    if _client is None:
-        _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    return _client
+from app.services.ai_errors import safe_chat_completion
 
 # Domaines disponibles avec contexte
 DOMAINES = {
@@ -81,7 +72,7 @@ Utilise le format Markdown avec :
 - > pour les notes importantes
 """
 
-    response = get_client().chat.completions.create(
+    response = safe_chat_completion(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,

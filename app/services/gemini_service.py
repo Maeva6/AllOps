@@ -95,20 +95,12 @@
 #     return cleaned
 
 # app/services/gemini_service.py
-import os
 import json
 import re
-from groq import Groq
 import random
+from app.services.ai_errors import safe_chat_completion
 
 # On utilise Groq à la place de Gemini pour éviter les quotas
-_client = None
-
-def get_client():
-    global _client
-    if _client is None:
-        _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    return _client
 
 QUIZ_CONFIG = {
     1:  {"nb": 5,  "diff": "très facile, questions de compréhension de base"},
@@ -169,7 +161,7 @@ Le champ "correct" est l'INDEX (0-3) de la bonne réponse dans "choices".
 Génère exactement {cfg['nb']} questions, pas plus, pas moins.
 """
 
-    response = get_client().chat.completions.create(
+    response = safe_chat_completion(
         model="llama-3.3-70b-versatile",
         messages=[
             {

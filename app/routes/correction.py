@@ -16,6 +16,7 @@ from app.services.correction_service import (
     generer_word_correction,
     TYPES_DOC,
 )
+from app.services.ai_errors import IAError
 import fitz
 
 UTC = timezone.utc
@@ -108,6 +109,11 @@ def corriger(id):
         session_obj.statut = 'corrige'
         db.session.commit()
 
+    except IAError as e:
+        flash(str(e), 'danger')
+        session_obj.statut = 'erreur'
+        db.session.commit()
+        return redirect(url_for('correction.index'))
     except Exception as e:
         flash(f'Erreur lors de la correction : {str(e)}', 'danger')
         session_obj.statut = 'erreur'

@@ -1,16 +1,14 @@
 # app/routes/qa.py
-import os
 import json
 from datetime import datetime, timezone
 from flask import (Blueprint, render_template, request,
                    jsonify, Response)
 from app.extensions import db
 from app.models import SessionQA
-from groq import Groq
+from app.services.ai_errors import safe_chat_completion, IAError
 
 UTC = timezone.utc
 qa_bp = Blueprint('qa', __name__, url_prefix='/qa')
-client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
 
 MODES = {
     'direct':   'Réponse directe et concise',
@@ -78,7 +76,7 @@ def poser():
 Mode de réponse : {instruction}"""
 
     try:
-        response = client.chat.completions.create(
+        response = safe_chat_completion(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -105,6 +103,8 @@ Mode de réponse : {instruction}"""
             'id':      session_qa.id,
         })
 
+    except IAError as e:
+        return jsonify({'erreur': str(e)}), 503
     except Exception as e:
         return jsonify({'erreur': str(e)}), 500
 

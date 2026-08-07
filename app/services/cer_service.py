@@ -3,6 +3,10 @@ import json
 import re
 from groq import Groq
 
+# ══════════════════════════════════════════════════════════════════════
+# LAZY INIT CLIENT GROQ
+# ══════════════════════════════════════════════════════════════════════
+
 _client = None
 
 def get_client():
@@ -13,11 +17,31 @@ def get_client():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# FONCTIONS DE NETTOYAGE LATEX  (au niveau module, pas dans une fonction)
+# UTILITAIRES LATEX
 # ══════════════════════════════════════════════════════════════════════
 
+def _esc(s: str) -> str:
+    """Échappe les caractères spéciaux LaTeX pour les métadonnées."""
+    if not s:
+        return ''
+    replacements = [
+        ('\\', '\\textbackslash{}'),
+        ('&',  '\\&'),
+        ('%',  '\\%'),
+        ('_',  '\\_'),
+        ('#',  '\\#'),
+        ('{',  '\\{'),
+        ('}',  '\\}'),
+        ('$',  '\\$'),
+        ('^',  '\\^{}'),
+        ('~',  '\\~{}'),
+    ]
+    for old, new in replacements:
+        s = s.replace(old, new)
+    return s
+
+
 def nettoyer_texte_latex(text: str) -> str:
-    """Nettoie le texte généré par l'IA pour éviter les erreurs LaTeX."""
     if not text:
         return ""
     text = text.replace('\u2019', "'").replace('\u2018', "`")
@@ -29,7 +53,6 @@ def nettoyer_texte_latex(text: str) -> str:
 
 
 def nettoyer_code_listing(code: str) -> str:
-    """Nettoie le code dans lstlisting — les accents > U+00FF → ASCII."""
     return ''.join(c if ord(c) <= 0x00FF else '?' for c in code)
 
 
@@ -49,163 +72,87 @@ def generer_section_cer(
     etape_index: int = None,
     etape_label: str = None
 ) -> str:
-    """Génère une section du CER via Groq. Retourne du Markdown riche."""
-
-    plan_str = "\n".join(
-        [f"{i+1}. {p}" for i, p in enumerate(plan_action)]
+    plan_str = "\n".join([f"{i+1}. {p}" for i, p in enumerate(plan_action)])
+    source_ctx = (
+        f"\nDocuments de référence (corbeille / workshop) :\n---\n{contenu_source[:4000]}\n---\n"
+        if contenu_source else ""
     )
 
-    source_ctx = f"""
-Documents de référence (corbeille / workshop) :
----
-{contenu_source[:4000]}
----
-""" if contenu_source else ""
-
     if section == "realisation_etape":
-        prompt = f"""Tu es un expert académique et tu rédiges un Cahier d'Étude et de Recherche
-(CER) pour un étudiant de l'UCAC-ICAM en ingénierie informatique.
+        prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
 
-CONTEXTE DU PROSIT : {titre_prosit}
-
-Situation déclenchante :
-{contexte}
-
-Besoins identifiés :
-{besoins}
-
-Contraintes :
-{contraintes}
-
+PROSIT : {titre_prosit}
+Contexte : {contexte}
+Besoins : {besoins}
+Contraintes : {contraintes}
 Problématique : {problematique}
-
-Plan d'action complet :
-{plan_str}
-
+Plan d'action : {plan_str}
 {source_ctx}
 
-Tu dois rédiger le contenu détaillé de l'ÉTAPE {etape_index} du plan d'action :
-"{etape_label}"
+Rédige le contenu détaillé de l'ÉTAPE {etape_index} : "{etape_label}"
 
-RÈGLES ABSOLUES :
-1. Rédige un contenu académique riche, détaillé, d'au moins 400 mots pour cette étape
-2. Structure le contenu avec des sous-sections (###) si nécessaire
-3. Inclus OBLIGATOIREMENT :
-   - Des définitions précises des concepts clés
-   - Des exemples concrets liés au contexte du prosit
-   - Des tableaux comparatifs si pertinent (en Markdown)
-   - Du pseudocode si l'étape implique des algorithmes
-   - Des formules mathématiques en notation LaTeX ($...$) si pertinent
-   - Des explications step-by-step pour les algorithmes
-4. Utilise le contexte du prosit pour illustrer les concepts
-5. Écris en français académique, clair et précis
-6. Utilise le format Markdown avec **gras**, `code`, tableaux, listes
-
-Génère uniquement le contenu de cette étape, sans en-tête ni introduction générale.
+RÈGLES :
+1. Minimum 400 mots, style académique rigoureux
+2. Sous-sections (###) si nécessaire
+3. Inclure : définitions formelles, exemples liés au prosit, tableaux comparatifs si pertinent,
+   pseudocode/code si algorithmique, formules mathématiques ($...$) si pertinent
+4. Markdown : **gras**, `code`, tableaux |col|col|, listes
+5. Génère UNIQUEMENT le contenu, sans en-tête général
 """
 
     elif section == "validation":
         prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
 
-PROSIT : {titre_prosit}
-Problématique : {problematique}
-
-Plan d'action :
-{plan_str}
-
+PROSIT : {titre_prosit} | Problématique : {problematique}
+Plan : {plan_str}
 {source_ctx}
 
-Rédige la section "Validation des pistes de solutions" du CER.
-
-Cette section doit :
-1. Répondre à 4-5 questions de généralisation/validation liées au prosit
-2. Chaque question-réponse fait 150-200 mots
-3. Format : **Question X : [Question] ?** suivi de la réponse argumentée
-4. Relier chaque réponse au contexte du prosit
-5. Conclure chaque validation avec une mention Validée/Partiellement validée/Infirmée
-
-Génère uniquement le contenu de la section validation.
+Rédige "Validation des pistes de solutions" :
+- 4-5 sous-sections, chacune = une piste sous forme de question
+- Format : sous-titre "Piste X : [question] ?" puis réponse 150-200 mots
+- Conclure chaque piste : "**Piste validée / partiellement validée / invalidée.**"
 """
 
     elif section == "conclusion":
-        prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
+        prompt = f"""CER UCAC-ICAM — PROSIT : {titre_prosit}
+Problématique : {problematique} | Plan : {plan_str}
 
-PROSIT : {titre_prosit}
-Problématique : {problematique}
-Plan d'action :
-{plan_str}
-
-Rédige la section "Conclusion et retours sur les objectifs" du CER.
-
-La conclusion doit :
-1. Rappeler brièvement la problématique
-2. Faire un bilan point par point de chaque étape du plan d'action
-   avec statut : Atteint / Partiellement atteint / Non atteint
-3. Synthétiser la solution retenue pour répondre à la problématique
-4. Minimum 250 mots, style académique
-
-Génère uniquement le contenu de la conclusion.
+Rédige "Conclusion et retours sur les objectifs" :
+1. Rappel de la problématique
+2. Bilan par étape (Atteint / Partiellement / Non atteint) en liste à puces
+3. Synthèse de la réponse à la problématique
+Minimum 250 mots.
 """
 
     elif section == "bilan":
-        prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
+        prompt = f"""CER UCAC-ICAM — PROSIT : {titre_prosit} | Plan : {plan_str}
 
-PROSIT : {titre_prosit}
-Plan d'action :
-{plan_str}
-
-Rédige la section "Bilan critique du travail effectué" du CER.
-
-Le bilan doit :
-1. Analyser les points forts du travail réalisé
-2. Identifier les limites et difficultés rencontrées
-3. Proposer des améliorations et perspectives
-4. Mentionner les notions complémentaires à approfondir
-5. Minimum 200 mots, style réflexif et critique
-
-Génère uniquement le contenu du bilan critique.
+Rédige "Bilan critique du travail effectué" en liste à puces :
+- Points forts
+- Limites et difficultés
+- Perspectives et approfondissements possibles
+Minimum 200 mots, style réflexif.
 """
 
     elif section == "synthese":
-        prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
+        prompt = f"""CER UCAC-ICAM — PROSIT : {titre_prosit} | Plan : {plan_str}
 
-PROSIT : {titre_prosit}
-Plan d'action :
-{plan_str}
-
-Rédige la section "Synthèse des résultats obtenus" du CER.
-
-La synthèse doit :
-1. Résumer les résultats clés de chaque étape du plan d'action
-2. Utiliser des bullet points structurés
-3. Inclure les données chiffrées/comparatives importantes découvertes
-4. Mettre en valeur les résultats les plus importants en **gras**
-5. Minimum 200 mots
-
-Génère uniquement la synthèse des résultats.
+Rédige "Synthèse des résultats obtenus" :
+- Résumé par étape en bullet points
+- Données chiffrées si disponibles
+- Résultats clés en **gras**
+Minimum 200 mots.
 """
 
     elif section == "references":
-        prompt = f"""Tu es un expert académique rédigeant un CER pour l'UCAC-ICAM.
+        prompt = f"""CER UCAC-ICAM — PROSIT : {titre_prosit} | Thèmes : {plan_str}
 
-PROSIT : {titre_prosit}
-Thèmes du plan d'action :
-{plan_str}
-
-Génère une bibliographie académique réaliste et pertinente pour ce CER.
-
-La bibliographie doit :
-1. Contenir 6-10 références pertinentes
-2. Inclure : livres académiques, articles, documentation officielle, cours en ligne
-3. Couvrir les thèmes principaux du plan d'action
-4. Respecter le format : Auteur, *Titre*, Éditeur/URL, Année
-5. Inclure des URLs réelles connues (MIT Press, OpenClassrooms, docs officiels...)
-
-Format Markdown :
-- [1] Auteur, *Titre*, ...
-- [2] ...
-
-Génère uniquement la bibliographie.
+Génère une bibliographie académique de 6-10 références.
+Format OBLIGATOIRE (une référence par ligne) :
+[1] Auteur, *Titre*, Éditeur, Année.
+[2] ...
+Inclure : livres académiques, articles, URLs réels (MIT, OpenClassrooms, docs officiels).
+NE génère QUE la bibliographie, pas d'autre texte.
 """
 
     else:
@@ -217,32 +164,29 @@ Génère uniquement la bibliographie.
         temperature=0.7,
         max_tokens=3000,
     )
-
     return response.choices[0].message.content
 
 
 # ══════════════════════════════════════════════════════════════════════
 # CONVERSION MARKDOWN → LATEX
+# Produit du LaTeX conforme au style du PDF exemple (boîtes tcolorbox,
+# puces rouges, numéros rouges gras, booktabs, lstlisting)
 # ══════════════════════════════════════════════════════════════════════
 
 def markdown_to_latex(md_text: str) -> str:
-    """Convertit du Markdown enrichi en LaTeX propre."""
     if not md_text:
         return ''
+    md_text   = nettoyer_texte_latex(md_text)
+    lines     = md_text.split('\n')
+    result    = []
+    in_code   = False
+    in_item   = False
+    in_enum   = False
+    in_table  = False
+    table_buf = []
 
-    # Nettoyage préalable
-    md_text = nettoyer_texte_latex(md_text)
-
-    lines      = md_text.split('\n')
-    result     = []
-    in_code    = False
-    in_item    = False
-    in_enum    = False
-    in_table   = False
-    table_buf  = []
-
-    def process_inline(text):
-        """Formate le texte inline : gras, italique, code, liens."""
+    def pi(text):
+        """Process inline markdown."""
         text = re.sub(r'\*\*(.+?)\*\*', r'\\textbf{\1}', text)
         text = re.sub(r'\*(.+?)\*',     r'\\textit{\1}', text)
         text = re.sub(r'`([^`]+)`',     r'\\texttt{\1}', text)
@@ -264,67 +208,49 @@ def markdown_to_latex(md_text: str) -> str:
         nonlocal table_buf, in_table
         if not table_buf:
             return []
-        rows = [r for r in table_buf
-                if not re.match(r'^\|[-\s|:]+\|$', r.strip())]
+        # Filtrer les lignes séparatrices
+        rows = [r for r in table_buf if not re.match(r'^\|[-\s|:]+\|$', r.strip())]
         if not rows:
-            table_buf = []
-            in_table  = False
+            table_buf = []; in_table = False
             return []
-
-        first_row = rows[0]
-        cols      = [c.strip() for c in first_row.strip('|').split('|')]
-        nb_cols   = len(cols)
-        col_spec  = '|' + '|'.join(['l'] * nb_cols) + '|'
-
+        cols    = [c.strip() for c in rows[0].strip('|').split('|')]
+        nb_cols = len(cols)
         out = [
             r'\begin{center}',
-            r'\begin{tabular}{' + col_spec + '}',
-            r'\hline',
+            r'\begin{tabular}{' + 'l' * nb_cols + '}',
+            r'\toprule',
         ]
         for i, row in enumerate(rows):
             cells = [c.strip() for c in row.strip('|').split('|')]
             while len(cells) < nb_cols:
                 cells.append('')
             if i == 0:
-                row_str = ' & '.join(
-                    r'\textbf{' + process_inline(c) + '}'
-                    for c in cells[:nb_cols]
-                )
+                out.append(' & '.join(r'\textbf{' + pi(c) + '}' for c in cells[:nb_cols]) + r' \\')
+                out.append(r'\midrule')
             else:
-                row_str = ' & '.join(
-                    process_inline(c) for c in cells[:nb_cols]
-                )
-            out.append(row_str + r' \\')
-            out.append(r'\hline')
-
-        out += [r'\end{tabular}', r'\end{center}', '']
-        table_buf = []
-        in_table  = False
+                out.append(' & '.join(pi(c) for c in cells[:nb_cols]) + r' \\')
+        out += [r'\bottomrule', r'\end{tabular}', r'\end{center}', '']
+        table_buf = []; in_table = False
         return out
 
+    LANG_MAP = {
+        'python':'Python','java':'Java','c':'C','cpp':'C++',
+        'js':'JavaScript','bash':'bash','sql':'SQL','':'Python'
+    }
+
     for line in lines:
-        stripped = line.strip()
+        s = line.strip()
 
         # ── Blocs de code ─────────────────────────────────────────────
-        if stripped.startswith('```'):
+        if s.startswith('```'):
             result.extend(close_lists())
-            if in_table:
-                result.extend(flush_table())
+            if in_table: result.extend(flush_table())
             if in_code:
-                result.append(r'\end{lstlisting}')
-                result.append('')
+                result += [r'\end{lstlisting}', '']
                 in_code = False
             else:
-                lang     = stripped[3:].strip().lower()
-                lang_map = {
-                    'python': 'Python', 'java': 'Java',
-                    'c': 'C', 'cpp': 'C++', 'js': 'JavaScript',
-                    'bash': 'bash', 'sql': 'SQL', '': 'Python',
-                }
-                detected = lang_map.get(lang, 'Python')
-                result.append(
-                    r'\begin{lstlisting}[language=' + detected + ']'
-                )
+                lang = LANG_MAP.get(s[3:].strip().lower(), 'Python')
+                result.append(r'\begin{lstlisting}[language=' + lang + ']')
                 in_code = True
             continue
 
@@ -333,77 +259,165 @@ def markdown_to_latex(md_text: str) -> str:
             continue
 
         # ── Tableaux ──────────────────────────────────────────────────
-        if stripped.startswith('|'):
+        if s.startswith('|'):
             result.extend(close_lists())
             in_table = True
-            table_buf.append(stripped)
+            table_buf.append(s)
             continue
         elif in_table:
             result.extend(flush_table())
 
         # ── Ligne vide ────────────────────────────────────────────────
-        if not stripped:
+        if not s:
             result.extend(close_lists())
             result.append('')
             continue
 
         # ── Titres ────────────────────────────────────────────────────
-        if stripped.startswith('#### '):
+        if s.startswith('#### '):
             result.extend(close_lists())
-            result.append(r'\paragraph{' + process_inline(stripped[5:]) + '}')
+            result.append(r'\paragraph{' + pi(s[5:]) + '}')
             continue
-        if stripped.startswith('### '):
+        if s.startswith('### '):
             result.extend(close_lists())
-            result.append(r'\subsubsection{' + process_inline(stripped[4:]) + '}')
+            result.append(r'\subsubsection{' + pi(s[4:]) + '}')
             continue
-        if stripped.startswith('## '):
+        if s.startswith('## '):
             result.extend(close_lists())
-            result.append(r'\subsection{' + process_inline(stripped[3:]) + '}')
+            result.append(r'\subsection{' + pi(s[3:]) + '}')
             continue
-        if stripped.startswith('# '):
+        if s.startswith('# '):
             result.extend(close_lists())
-            result.append(r'\section{' + process_inline(stripped[2:]) + '}')
+            result.append(r'\section{' + pi(s[2:]) + '}')
             continue
 
-        # ── Listes non ordonnées ──────────────────────────────────────
-        if re.match(r'^[-*+] ', stripped):
+        # ── Listes non ordonnées (puces rouges comme dans le PDF) ─────
+        if re.match(r'^[-*+] ', s):
             if not in_item:
                 result.extend(close_lists())
-                result.append(r'\begin{itemize}')
+                result.append(
+                    r'\begin{itemize}[leftmargin=1.5cm,'
+                    r' label=\textcolor{maincolor}{$\bullet$}]'
+                )
                 in_item = True
-            result.append(r'  \item ' + process_inline(stripped[2:]))
+            result.append(r'  \item ' + pi(s[2:]))
             continue
 
-        # ── Listes ordonnées ──────────────────────────────────────────
-        if re.match(r'^\d+\. ', stripped):
+        # ── Listes ordonnées (numéros rouges gras comme dans le PDF) ──
+        if re.match(r'^\d+\. ', s):
             if not in_enum:
                 result.extend(close_lists())
-                result.append(r'\begin{enumerate}')
+                result.append(
+                    r'\begin{enumerate}[leftmargin=1.5cm,'
+                    r' label=\textcolor{maincolor}{\textbf{\arabic*.}}]'
+                )
                 in_enum = True
-            content = re.sub(r'^\d+\.\s+', '', stripped)
-            result.append(r'  \item ' + process_inline(content))
+            result.append(r'  \item ' + pi(re.sub(r'^\d+\.\s+', '', s)))
             continue
 
         # ── Paragraphe normal ─────────────────────────────────────────
         result.extend(close_lists())
-        result.append(process_inline(stripped))
+        result.append(pi(s))
         result.append('')
 
-    # Fermer ce qui reste ouvert
     result.extend(close_lists())
-    if in_table:
-        result.extend(flush_table())
-    if in_code:
-        result.append(r'\end{lstlisting}')
+    if in_table: result.extend(flush_table())
+    if in_code:  result.append(r'\end{lstlisting}')
 
-    # Vérifier l'équilibre itemize/enumerate
     text = '\n'.join(result)
     for env in ['itemize', 'enumerate']:
         diff = text.count(f'\\begin{{{env}}}') - text.count(f'\\end{{{env}}}')
         if diff > 0:
             text += f'\n\\end{{{env}}}' * diff
-
     return text
+
+
+# ══════════════════════════════════════════════════════════════════════
+# PRÉAMBULE LATEX  (identique au .tex exemple fourni)
+# ══════════════════════════════════════════════════════════════════════
+
+PREAMBLE = r"""\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes,arrows,calc}
+\usepackage{url}
+\usepackage{ragged2e}
+\usepackage[colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=black]{hyperref}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{multirow}
+\usepackage{tcolorbox}
+\tcbuselibrary{theorems,skins,breakable}
+
+\geometry{margin=2.5cm, headheight=15pt}
+
+% ===== COULEURS =====
+\definecolor{maincolor}{RGB}{180,0,0}
+\definecolor{lightgray}{RGB}{240,240,240}
+\definecolor{codeblue}{RGB}{0,0,180}
+\definecolor{lightblue}{RGB}{220,235,248}
+\definecolor{lightgreen}{RGB}{230,255,230}
+\definecolor{lightyellow}{RGB}{255,255,220}
+\definecolor{lightred}{RGB}{255,240,240}
+\definecolor{sectiongray}{RGB}{80,80,80}
+\definecolor{darkgreen}{RGB}{0,120,0}
+
+% ===== BOITES TCOLORBOX =====
+\tcbset{
+  defbox/.style={colback=lightblue,colframe=maincolor,
+    fonttitle=\bfseries,arc=4pt,boxrule=1.5pt,breakable},
+  proofbox/.style={colback=lightgreen,colframe=darkgreen,
+    fonttitle=\bfseries\color{darkgreen},arc=4pt,boxrule=1pt,breakable},
+  propbox/.style={colback=lightyellow,colframe=orange!70!black,
+    fonttitle=\bfseries,arc=4pt,boxrule=1pt,breakable},
+  warnbox/.style={colback=lightred,colframe=maincolor,
+    fonttitle=\bfseries\color{maincolor},arc=4pt,boxrule=1pt,breakable}
+}
+
+% ===== STYLE CODE =====
+\lstset{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{lightgray},
+  frame=single, breaklines=true, language=Python,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  showstringspaces=false,
+  numbers=left, numberstyle=\tiny\color{gray},
+  stepnumber=1, tabsize=2,
+  literate=
+    {é}{{\'{e}}}1 {è}{{\`{e}}}1 {ê}{{\^{e}}}1 {ë}{{\"{e}}}1
+    {à}{{\`{a}}}1 {â}{{\^{a}}}1 {ù}{{\`{u}}}1 {û}{{\^{u}}}1
+    {î}{{\^{i}}}1 {ï}{{\"{i}}}1 {ô}{{\^{o}}}1 {ç}{{\c{c}}}1
+    {É}{{\'{E}}}1 {È}{{\`{E}}}1 {À}{{\`{A}}}1 {Î}{{\^{I}}}1
+    {Ç}{{\c{C}}}1 {œ}{{\oe}}1 {Œ}{{\OE}}1 {°}{{$^{\circ}$}}1,
+}
+
+% ===== EN-TÊTES FANCYHDR =====
+\urlstyle{same}
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\UrlOrds}
+\makeatother
+
+\renewcommand\thesection{\Roman{section}}
+\renewcommand\thesubsection{\thesection.\arabic{subsection}}
+"""
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -411,233 +425,280 @@ def markdown_to_latex(md_text: str) -> str:
 # ══════════════════════════════════════════════════════════════════════
 
 def generer_latex_complet(cer) -> str:
-    """Génère le document LaTeX complet du CER."""
+    """
+    Génère le document LaTeX complet conforme au PDF exemple :
+    CER_MAWAMBA_TOWA_Maëva_X2028.pdf
+    """
     from datetime import datetime
 
-    plan       = cer.get_plan_action()
-    plan_items = '\n'.join([f'    \\item {p}' for p in plan])
-
-    def md2tex(text):
-        return markdown_to_latex(text) if text else ''
-
-    def esc(s):
-        """Échappe les caractères spéciaux LaTeX dans les métadonnées."""
-        if not s:
-            return ''
-        return (s.replace('%', '\\%')
-                 .replace('&', '\\&')
-                 .replace('_', '\\_'))
-
-    # Sections de réalisation
-    realisation_sections = ""
-    if cer.realisation:
-        try:
-            real = json.loads(cer.realisation)
-            for i, etape in enumerate(plan):
-                contenu = real.get(str(i), '')
-                etape_esc = esc(etape)
-                realisation_sections += (
-                    f"\n\\subsection{{{etape_esc}}}\n\n"
-                    f"{md2tex(contenu)}\n\n"
-                )
-        except Exception:
-            realisation_sections = md2tex(cer.realisation)
+    plan = cer.get_plan_action()
 
     date_str = (
         cer.created_at.strftime('%d/%m/%Y')
         if cer.created_at else datetime.now().strftime('%d/%m/%Y')
     )
 
-    # Infos page de garde
-    titre_esc   = esc(cer.titre_prosit or '')
-    etudiant    = esc(cer.etudiant or '')
-    pilote_line = (f"    {{\\Large Pilote : {esc(cer.pilote)} \\par}}\n"
-                   if cer.pilote else "")
-    copilote_line = (f"    {{\\Large Co-pilote : {esc(cer.copilote)} \\par}}\n"
-                     if cer.copilote else "")
-    promo_line  = (f"    {{\\large {esc(cer.promotion)} \\par}}\n"
-                   if cer.promotion else "")
+    def md2tex(text):
+        return markdown_to_latex(text) if text else ''
 
-    latex = (
-        r"""\documentclass[12pt]{report}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[french]{babel}
-\usepackage{graphicx}
-\usepackage[a4paper, margin=2.5cm]{geometry}
-\usepackage[table]{xcolor}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{tabularx}
-\usepackage{booktabs}
-\usepackage{multirow}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{listings}
-\usepackage{enumitem}
-\usepackage{float}
-\usepackage{caption}
-\usepackage{fancyhdr}
-\usepackage[hyphens]{url}
-\usepackage[colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=black]{hyperref}
+    # ── Titre : décomposer "Prosit NX — Thème" sur 2 lignes ───────────
+    titre_raw = cer.titre_prosit or 'CER'
+    m = re.match(
+        r'^(Prosit\s+N[°o]?\s*\d+\s*[—\-–]+\s*.+?)\s*[—\-–]+\s*(.+)$',
+        titre_raw, re.IGNORECASE
+    )
+    if m:
+        t1 = _esc(m.group(1).strip())
+        t2 = _esc(m.group(2).strip())
+        titre_tikz_lines = (
+            f"      {{\\Huge \\textbf{{\\underline{{{t1}}}}}}} \\\\[0.4cm]\n"
+            f"      {{\\Huge \\textbf{{\\underline{{{t2}}}}}}} \\\\[0.6cm]\n"
+        )
+        theme_court = _esc(m.group(2).strip()[:38])
+    else:
+        t1 = _esc(titre_raw)
+        titre_tikz_lines = (
+            f"      {{\\Huge \\textbf{{\\underline{{{t1}}}}}}} \\\\[0.6cm]\n"
+        )
+        theme_court = _esc(titre_raw[:38])
 
-\renewcommand\thesection{\Roman{section}}
-\renewcommand\thesubsection{\thesection.\arabic{subsection}}
+    # ── Infos page de garde ───────────────────────────────────────────
+    etudiant_esc  = _esc(cer.etudiant  or '')
+    pilote_esc    = _esc(cer.pilote    or '')
+    copilote_esc  = _esc(cer.copilote  or '')
+    promotion_esc = _esc(cer.promotion or '')
 
-\definecolor{maincolor}{RGB}{180,0,0}
-\definecolor{lightgray}{RGB}{240,240,240}
-\definecolor{codeblue}{RGB}{0,0,180}
+    pilote_line   = f"  {{\\Large Pilote :{pilote_esc} \\par}}\n"   if cer.pilote   else ""
+    copilote_line = f"  {{\\Large Co-pilote : {copilote_esc} \\par}}\n" if cer.copilote else ""
+    promo_line    = f"  {{\\large {promotion_esc} \\par}}\n"         if cer.promotion else ""
 
-\lstset{
-  basicstyle=\small\ttfamily,
-  backgroundcolor=\color{lightgray},
-  frame=single,
-  breaklines=true,
-  language=Python,
-  keywordstyle=\color{codeblue}\bfseries,
-  commentstyle=\color{gray}\itshape,
-  showstringspaces=false,
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  stepnumber=1,
-  tabsize=2,
-  extendedchars=true,
-  literate=
-    {é}{{\'{e}}}1 {è}{{\`{e}}}1 {ê}{{\^{e}}}1 {ë}{{\"{e}}}1
-    {à}{{\`{a}}}1 {â}{{\^{a}}}1 {ä}{{\"{a}}}1
-    {ù}{{\`{u}}}1 {û}{{\^{u}}}1 {ü}{{\"{u}}}1
-    {î}{{\^{i}}}1 {ï}{{\"{i}}}1
-    {ô}{{\^{o}}}1 {ö}{{\"{o}}}1
-    {ç}{{\c{c}}}1
-    {É}{{\'{E}}}1 {È}{{\`{E}}}1 {Ê}{{\^{E}}}1
-    {À}{{\`{A}}}1 {Â}{{\^{A}}}1
-    {Î}{{\^{I}}}1 {Ô}{{\^{O}}}1 {Ù}{{\`{U}}}1
-    {Ç}{{\c{C}}}1 {œ}{{\oe}}1 {Œ}{{\OE}}1
-    {°}{{$^{\circ}$}}1 {'}{{'}}1,
-}
+    # ── Besoins / Contraintes → liste LaTeX ───────────────────────────
+    def to_itemize_rouge(text: str) -> str:
+        """Convertit un texte (une ligne = un item) en itemize rouge."""
+        items = [
+            l.lstrip('-•* \t').strip()
+            for l in (text or '').splitlines()
+            if l.strip() and not l.strip().startswith('#')
+        ]
+        if not items:
+            return ''
+        lines = [
+            r'\begin{itemize}[leftmargin=1.5cm,'
+            r' label=\textcolor{maincolor}{$\bullet$}]'
+        ]
+        for it in items:
+            lines.append(r'  \item ' + _esc(it))
+        lines.append(r'\end{itemize}')
+        return '\n'.join(lines)
 
-\urlstyle{same}
-\sloppy
-
-\begin{document}
-
-% ── PAGE DE GARDE ─────────────────────────────────────────────────────────────
-\begin{titlepage}
-    \pagestyle{empty}
-    \centering
-    \vspace*{1.5cm}
-
-    {\color{maincolor}\rule{\textwidth}{4pt}}\\[0.8cm]
-
-    {\Huge\bfseries\color{maincolor} Cahier d'\'Etude et de Recherche}\\[1cm]
-
-    \colorbox{maincolor!10}{%
-        \parbox{0.86\textwidth}{\centering\vspace{0.5cm}
-            {\Large\bfseries\color{maincolor} """
-        + titre_esc
-        + r"""}\\[0.4cm]
-        \vspace{0.4cm}}%
-    }
-
-    \vfill
-
-    \begin{tabular}{rl}
-"""
-        + (f"        \\textbf{{\\'{{'}}Etudiant :}} & {etudiant} \\\\[0.3cm]\n"
-           if etudiant else "")
-        + (f"        \\textbf{{Pilote :}} & {esc(cer.pilote)} \\\\[0.3cm]\n"
-           if cer.pilote else "")
-        + (f"        \\textbf{{Co-pilote :}} & {esc(cer.copilote)} \\\\[0.3cm]\n"
-           if cer.copilote else "")
-        + (f"        \\textbf{{Promotion :}} & {esc(cer.promotion)} \\\\[0.3cm]\n"
-           if cer.promotion else "")
-        + f"        \\textbf{{Date :}} & {date_str} \\\\\n"
-        + r"""    \end{tabular}
-
-    \vspace{1.5cm}
-    {\color{maincolor}\rule{\textwidth}{4pt}}
-\end{titlepage}
-
-% ── TABLE DES MATIÈRES ────────────────────────────────────────────────────────
-\tableofcontents
-\newpage
-
-\setlength{\parskip}{0.5em}
-\setlength{\parindent}{0pt}
-
-% ── SECTIONS ──────────────────────────────────────────────────────────────────
-\section{Analyse du contexte}
-
-"""
-        + md2tex(cer.contexte)
-        + r"""
-
-\section{Analyse des besoins}
-
-\subsection*{Besoins}
-
-"""
-        + md2tex(cer.besoins)
-        + r"""
-
-\subsection*{Contraintes}
-
-"""
-        + md2tex(cer.contraintes or '')
-        + r"""
-
-\section{D\'efinition de la probl\'ematique}
-
-"""
-        + md2tex(cer.problematique)
-        + r"""
-
-\section{Plan d'action}
-
-\begin{enumerate}[leftmargin=*, label=\arabic*.]
-"""
-        + plan_items
-        + r"""
-\end{enumerate}
-
-\section{R\'ealisation du plan d'action}
-
-"""
-        + realisation_sections
-        + r"""
-
-\section{Validation des pistes de solutions}
-
-"""
-        + md2tex(cer.validation or '')
-        + r"""
-
-\section{Conclusion et retours sur les objectifs}
-
-"""
-        + md2tex(cer.conclusion or '')
-        + r"""
-
-\section{Bilan critique du travail effectu\'e}
-
-"""
-        + md2tex(cer.bilan or '')
-        + r"""
-
-\section{Synth\`ese des r\'esultats obtenus}
-
-"""
-        + md2tex(cer.synthese or '')
-        + r"""
-
-\section{R\'ef\'erences bibliographiques}
-
-"""
-        + md2tex(cer.references or '')
-        + r"""
-
-\end{document}
-"""
+    # ── Plan d'action ─────────────────────────────────────────────────
+    plan_items = '\n'.join(
+        f'  \\item {_esc(p)}' for p in plan
     )
 
-    return latex
+    # ── Réalisation ───────────────────────────────────────────────────
+    realisation_sections = ""
+    if cer.realisation:
+        try:
+            real = json.loads(cer.realisation)
+            for i, etape in enumerate(plan):
+                contenu = real.get(str(i), '')
+                realisation_sections += (
+                    "\n% " + "─" * 60 + "\n"
+                    f"\\subsection{{{_esc(etape)}}}\n"
+                    "% " + "─" * 60 + "\n\n"
+                    + md2tex(contenu) + "\n\n"
+                )
+        except Exception:
+            realisation_sections = md2tex(cer.realisation)
+
+    # ── Validation → sous-sections ────────────────────────────────────
+    # Le md2tex gère déjà les ### comme \subsubsection
+    validation_tex = md2tex(cer.validation or '')
+
+    # ── Bibliographie → \begin{thebibliography} ───────────────────────
+    def build_biblio(text: str) -> str:
+        if not text:
+            return (
+                r'\begin{thebibliography}{99}' + '\n'
+                r'\bibitem{cormen} T.~H. Cormen, C.~E. Leiserson, R.~L. Rivest'
+                r' et C.~Stein, \textit{Introduction \`{a} l\'algorithmique},'
+                r' 3\`{e}me \'ed., Dunod, 2010.' + '\n'
+                r'\end{thebibliography}'
+            )
+        items = re.findall(
+            r'\[(\d+)\]\s+(.+?)(?=\n\s*\[\d+\]|\Z)',
+            text, re.DOTALL
+        )
+        if not items:
+            # Fallback : liste à puces → thebibliography auto-numérotée
+            lignes = [l.lstrip('-•* ').strip() for l in text.splitlines() if l.strip()]
+            out = [r'\begin{thebibliography}{99}']
+            for j, l in enumerate(lignes, 1):
+                l = re.sub(r'\*(.+?)\*', r'\\textit{\1}', l)
+                out.append(f'\\bibitem{{ref{j}}} {l}')
+            out.append(r'\end{thebibliography}')
+            return '\n'.join(out)
+        out = [r'\begin{thebibliography}{99}', '']
+        for num, content in items:
+            content = content.strip().replace('\n', ' ')
+            content = re.sub(r'\*(.+?)\*', r'\\textit{\1}', content)
+            out.append(f'\\bibitem{{ref{num}}}\n{content}\n')
+        out.append(r'\end{thebibliography}')
+        return '\n'.join(out)
+
+    biblio_tex = build_biblio(cer.references or '')
+
+    # ══════════════════════════════════════════════════════════════════
+    # ASSEMBLAGE DU DOCUMENT
+    # ══════════════════════════════════════════════════════════════════
+
+    doc = PREAMBLE
+
+    # En-têtes fancyhdr (dépend du titre → après PREAMBLE)
+    doc += f"""
+\\pagestyle{{fancy}}
+\\fancyhf{{}}
+\\fancyhead[L]{{\\textcolor{{maincolor}}{{\\textbf{{UCAC-ICAM}}}}}}
+\\fancyhead[R]{{\\textcolor{{maincolor}}{{\\textbf{{CER -- {theme_court}}}}}}}
+\\fancyfoot[C]{{\\textcolor{{sectiongray}}{{\\thepage}}}}
+\\renewcommand{{\\headrulewidth}}{{1.5pt}}
+\\renewcommand{{\\headrule}}{{%
+  \\hbox to\\headwidth{{\\color{{maincolor}}\\leaders\\hrule height \\headrulewidth\\hfill}}}}
+
+\\begin{{document}}
+
+% ============================================================
+%                     PAGE DE GARDE
+% ============================================================
+\\begin{{titlepage}}
+  \\pagestyle{{empty}}
+  % Cadre rouge épais tout autour (identique au PDF exemple)
+  \\begin{{tikzpicture}}[remember picture, overlay]
+    \\draw[line width=24pt, color=maincolor]
+      (current page.north west) rectangle (current page.south east);
+  \\end{{tikzpicture}}
+  \\centering
+  \\vspace{{1cm}}
+
+  % ── Logo ──────────────────────────────────────────────────────────
+  % Utilise logo.jpg si présent dans le même dossier que le .tex
+  % Sinon, bloc TikZ de remplacement (commenter/décommenter selon le cas)
+  %\\includegraphics[width=5cm]{{logo.jpg}}
+  \\begin{{tikzpicture}}
+    \\fill[maincolor, rounded corners=6pt] (0,0) rectangle (5.5,2.2);
+    \\fill[white, rounded corners=3pt] (0.15,0.15) rectangle (5.35,2.05);
+    \\node[font=\\Large\\bfseries, text=maincolor] at (2.75,1.6) {{UCAC-ICAM}};
+    \\node[font=\\footnotesize, text=sectiongray] at (2.75,1.0)
+      {{Universit\\\'{{e}} Catholique d'Afrique Centrale}};
+    \\node[font=\\footnotesize, text=sectiongray] at (2.75,0.55)
+      {{Institut Catholique d'Arts et M\\\'{{e}}tiers}};
+    \\draw[maincolor, line width=0.6pt] (0.9,1.3) -- (4.6,1.3);
+  \\end{{tikzpicture}}
+
+  \\vspace{{1.5cm}}
+
+  % ── Titre dans encadré TikZ arrondi (identique au PDF exemple) ────
+  \\begin{{tikzpicture}}
+    \\node[draw=maincolor, line width=1.5pt, rounded corners=5pt,
+          inner sep=16pt, align=center] {{
+{titre_tikz_lines}      {{\\Huge \\textbf{{Cahier d\\'\\\'{{E}}tude}}}} \\\\[0.3cm]
+      {{\\Huge \\textbf{{et de Recherche}}}}
+    }};
+  \\end{{tikzpicture}}
+
+  \\vfill
+
+  % ── Informations étudiant / encadrants ────────────────────────────
+  {{\\Large \\textbf{{{etudiant_esc}}} \\par}}
+  \\vspace{{0.4cm}}
+  {{\\large {date_str} \\par}}
+  \\vspace{{0.6cm}}
+{pilote_line}{copilote_line}{promo_line}\\end{{titlepage}}
+
+% ============================================================
+%                  TABLE DES MATIÈRES
+% ============================================================
+{{
+\\renewcommand{{\\baselinestretch}}{{2.0}}
+\\tableofcontents
+}}
+\\newpage
+
+% ============================================================
+\\section{{Analyse du contexte}}
+% ============================================================
+
+{md2tex(cer.contexte)}
+
+% ============================================================
+\\section{{Analyse des besoins}}
+% ============================================================
+
+\\subsection*{{Besoins}}
+{to_itemize_rouge(cer.besoins)}
+
+\\subsection*{{Contraintes}}
+{to_itemize_rouge(cer.contraintes)}
+
+\\subsection*{{Probl\\\'{{e}}matique}}
+
+\\begin{{mdframed}}[backgroundcolor=lightblue, linecolor=maincolor, linewidth=2pt,
+  innerleftmargin=10pt, innerrightmargin=10pt,
+  innertopmargin=8pt, innerbottommargin=8pt]
+\\textit{{{_esc(cer.problematique or '')}}}
+\\end{{mdframed}}
+
+% ============================================================
+\\section{{G\\\'{{e}}n\\\'{{e}}ralisation}}
+% ============================================================
+
+\\begin{{center}}
+  \\large\\textbf{{\\textcolor{{maincolor}}{{{_esc(titre_raw)}}}}}
+\\end{{center}}
+
+Ce prosit s\\'inscrit dans un domaine fondamental de l\\'informatique et des
+math\\\'{{e}}matiques appliqu\\\'{{e}}es. Les notions \\\'{{e}}tudi\\\'{{e}}es ont
+une port\\\'{{e}}e th\\\'{{e}}orique et pratique d\\\'{{e}}passant le seul cadre de ce prosit.
+
+% ============================================================
+\\section{{Plan d\\'action}}
+% ============================================================
+
+\\begin{{enumerate}}[leftmargin=1.5cm, label=\\textcolor{{maincolor}}{{\\textbf{{\\arabic*.}}}}]
+{plan_items}
+\\end{{enumerate}}
+
+% ============================================================
+\\section{{R\\\'{{e}}alisation du plan d\\'action}}
+% ============================================================
+
+{realisation_sections}
+
+% ============================================================
+\\section{{Validation des pistes de solutions}}
+% ============================================================
+
+{validation_tex}
+
+% ============================================================
+\\section{{Conclusion et retours sur les objectifs}}
+% ============================================================
+
+{md2tex(cer.conclusion or '')}
+
+% ============================================================
+\\section{{Bilan critique du travail effectu\\\'{{e}}}}
+% ============================================================
+
+{md2tex(cer.bilan or '')}
+
+% ============================================================
+%                 BIBLIOGRAPHIE
+% ============================================================
+
+{biblio_tex}
+
+\\end{{document}}
+"""
+    return doc

@@ -11,7 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"
+          onerror="window.lucide = window.lucide || { createIcons: function(){} };"></script>
 
   <style>
     /* ── Design tokens ───────────────────────────────────────────────────── */
@@ -1197,13 +1198,19 @@
   <!-- Lucide init -->
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    lucide.createIcons();
 
     // ── Theme toggle ───────────────────────────────────────────────────
+    // Cablé en premier et indépendamment des icônes : si le CDN Lucide
+    // est bloqué/lent/indisponible, le bouton doit continuer à marcher.
     const root        = document.documentElement;
     const themeToggle = document.getElementById('themeToggle');
     const iconLight   = document.getElementById('iconLight');
     const iconDark    = document.getElementById('iconDark');
+
+    function safeCreateIcons() {
+      try { window.lucide && lucide.createIcons(); }
+      catch (e) { console.warn('Lucide indisponible :', e); }
+    }
 
     function applyTheme(theme) {
       root.setAttribute('data-theme', theme);
@@ -1215,7 +1222,6 @@
         iconLight.style.display = 'none';
         iconDark.style.display  = 'block';
       }
-      lucide.createIcons();
     }
 
     // Charger thème sauvegardé
@@ -1243,6 +1249,9 @@
 
     burger?.addEventListener('click', openSidebar);
     overlay.addEventListener('click', closeSidebar);
+
+    // ── Icônes Lucide (non-bloquant) ─────────────────────────────────────
+    safeCreateIcons();
   });
 </script>
 

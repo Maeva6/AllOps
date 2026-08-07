@@ -11,12 +11,110 @@
   </h1>
 </div>
 
+<!-- ══ IMPORT PROSIT ALLER ══════════════════════════════════════════════════ -->
+<div class="card mb-4" id="cardPrositAller" style="
+  border:2px solid var(--accent);
+  background:var(--accent-glow)">
+  <div class="card-header" style="background:transparent">
+    <i data-lucide="upload-cloud" class="header-icon"
+       style="color:var(--accent)"></i>
+    <span style="color:var(--accent);font-weight:600">
+      Import rapide — Prosit Aller
+    </span>
+    <span style="font-size:11px;color:var(--text-muted);margin-left:8px">
+      Charge ton prosit aller pour pré-remplir automatiquement le formulaire
+    </span>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:12px;
+                align-items:center">
+
+      <!-- Drop zone prosit aller -->
+      <div id="dropZoneProsit" style="
+        border:2px dashed var(--accent);
+        border-radius:var(--radius);
+        padding:18px 24px;
+        text-align:center;
+        cursor:pointer;
+        background:var(--bg-elevated);
+        transition:background 0.2s">
+        <i data-lucide="file-search"
+           style="width:32px;height:32px;color:var(--accent);
+                  margin:0 auto 8px;display:block;stroke-width:1.5"></i>
+        <div style="font-size:13px;color:var(--text-secondary)">
+          Glisse ton prosit aller ici ou
+          <label for="inputPrositAller"
+                 style="color:var(--accent);cursor:pointer;font-weight:600">
+            parcourir
+          </label>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Formats acceptés : <strong>.docx</strong>, <strong>.md</strong>,
+          <strong>.txt</strong>, <strong>.pdf</strong>
+        </div>
+        <input type="file" id="inputPrositAller"
+               accept=".docx,.md,.markdown,.txt,.pdf"
+               style="display:none"
+               onchange="chargerPrositAller(this.files[0])">
+      </div>
+
+      <!-- Statut extraction -->
+      <div id="statutExtraction"
+           style="min-width:160px;text-align:center;padding:12px">
+        <div id="iconeStatut">
+          <i data-lucide="info"
+             style="width:28px;height:28px;color:var(--text-muted);
+                    margin:0 auto 6px;display:block"></i>
+          <div style="font-size:11.5px;color:var(--text-muted)">
+            Aucun fichier chargé
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Barre de progression extraction -->
+    <div id="barreExtraction" style="display:none;margin-top:12px">
+      <div style="height:4px;background:var(--border);border-radius:2px;
+                  overflow:hidden">
+        <div id="progressExtraction"
+             style="height:100%;width:0%;background:var(--accent);
+                    transition:width 0.3s;border-radius:2px"></div>
+      </div>
+      <div id="msgExtraction"
+           style="font-size:11.5px;color:var(--text-muted);
+                  margin-top:6px;text-align:center">
+        Extraction en cours…
+      </div>
+    </div>
+
+    <!-- Récap champs extraits -->
+    <div id="recapExtraction" style="display:none;margin-top:14px">
+      <div style="display:flex;align-items:center;gap:8px;
+                  padding:10px 14px;background:var(--success-dim);
+                  border:1px solid var(--success);border-radius:var(--radius);
+                  font-size:12.5px;color:var(--text-primary)">
+        <i data-lucide="check-circle"
+           style="width:16px;height:16px;color:var(--success);flex-shrink:0"></i>
+        <span id="texteRecap">Champs pré-remplis avec succès.</span>
+        <button type="button" onclick="reinitialiserFormulaire()"
+                class="btn btn-secondary btn-sm"
+                style="margin-left:auto;font-size:11px">
+          <i data-lucide="x"></i> Réinitialiser
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ FORMULAIRE CER ═══════════════════════════════════════════════════════ -->
 <form action="{{ url_for('cer.nouveau') }}" method="POST"
       enctype="multipart/form-data" id="formCER">
 <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;
             align-items:start">
 
-  <!-- Colonne principale -->
+  <!-- ── Colonne principale ─────────────────────────────────────────────── -->
   <div>
 
     <!-- Page de garde -->
@@ -28,38 +126,40 @@
       <div class="card-body">
         <div class="form-group">
           <label class="form-label">Titre du Prosit *</label>
-          <input type="text" name="titre_prosit" class="form-control"
+          <input type="text" name="titre_prosit" id="titre_prosit"
+                 class="form-control"
                  placeholder="ex: Prosit 4 — Les Architectes de l'Ordre"
                  required>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
             <label class="form-label">Numéro de Prosit</label>
-            <input type="text" name="numero_prosit" class="form-control"
-                   placeholder="Prosit 4">
+            <input type="text" name="numero_prosit" id="numero_prosit"
+                   class="form-control" placeholder="Prosit 4">
           </div>
           <div class="form-group">
             <label class="form-label">Promotion</label>
-            <input type="text" name="promotion" class="form-control"
-                   placeholder="X2028 — 3e année">
+            <input type="text" name="promotion" id="promotion"
+                   class="form-control" placeholder="X2028 — 3e année">
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Nom de l'étudiant *</label>
-          <input type="text" name="etudiant" class="form-control"
+          <input type="text" name="etudiant" id="etudiant"
+                 class="form-control"
                  placeholder="MAWAMBA TOWA Maëva"
                  value="{{ cer.etudiant if cer else '' }}" required>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
             <label class="form-label">Pilote</label>
-            <input type="text" name="pilote" class="form-control"
-                   placeholder="Mr BRUCE YOUMBI">
+            <input type="text" name="pilote" id="pilote"
+                   class="form-control" placeholder="Mr BRUCE YOUMBI">
           </div>
           <div class="form-group">
             <label class="form-label">Co-pilote</label>
-            <input type="text" name="copilote" class="form-control"
-                   placeholder="Mr IGOR EWOLO">
+            <input type="text" name="copilote" id="copilote"
+                   class="form-control" placeholder="Mr IGOR EWOLO">
           </div>
         </div>
       </div>
@@ -80,8 +180,9 @@
               — Décris la situation de l'entreprise/problème du Prosit
             </span>
           </label>
-          <textarea name="contexte" class="form-control" rows="4"
-                    placeholder="Ex: L'équipe de TechMove Cameroun travaille sur une application de gestion des itinéraires..."
+          <textarea name="contexte" id="contexte" class="form-control"
+                    rows="4"
+                    placeholder="Ex: L'équipe de TechMove Cameroun travaille sur..."
                     required></textarea>
         </div>
 
@@ -92,17 +193,17 @@
               — Liste les notions/concepts à étudier (une par ligne)
             </span>
           </label>
-          <textarea name="besoins" class="form-control" rows="5"
-                    placeholder="- Notions sur les graphes orientés / non orientés&#10;- Algorithmes de tri (QuickSort, MergeSort)&#10;- Algorithmes BFS et DFS&#10;..."
+          <textarea name="besoins" id="besoins" class="form-control"
+                    rows="5"
+                    placeholder="- Notions sur les graphes orientés / non orientés&#10;- Algorithmes BFS et DFS&#10;..."
                     required></textarea>
         </div>
 
         <div class="form-group">
-          <label class="form-label">
-            Contraintes
-          </label>
-          <textarea name="contraintes" class="form-control" rows="3"
-                    placeholder="- Implémenter BFS et DFS pour vérifier la connexité&#10;- Utiliser un algorithme plus efficace que O(n²)&#10;...">
+          <label class="form-label">Contraintes</label>
+          <textarea name="contraintes" id="contraintes"
+                    class="form-control" rows="3"
+                    placeholder="- Implémenter BFS et DFS pour vérifier la connexité&#10;...">
           </textarea>
         </div>
 
@@ -113,8 +214,9 @@
               — La question centrale sous forme de phrase interrogative
             </span>
           </label>
-          <textarea name="problematique" class="form-control" rows="3"
-                    placeholder="Comment améliorer les performances de l'application en sélectionnant les algorithmes et structures de données les plus adaptés ?"
+          <textarea name="problematique" id="problematique"
+                    class="form-control" rows="3"
+                    placeholder="Comment améliorer les performances en sélectionnant les algorithmes les plus adaptés ?"
                     required></textarea>
         </div>
 
@@ -122,17 +224,31 @@
           <label class="form-label">
             Plan d'action *
             <span style="color:var(--text-muted);font-weight:400">
-              — Une étape par ligne (l'IA génèrera le contenu de chaque étape)
+              — Une étape par ligne
             </span>
           </label>
           <textarea name="plan_action" class="form-control mono" rows="8"
                     id="planAction"
-                    placeholder="Définition des mots clés&#10;Étude des algorithmes de tri (insertion, fusion, rapide)&#10;Étude de la complexité algorithmique&#10;Étude des structures de graphes&#10;Étude des algorithmes BFS et DFS&#10;Étude du tri topologique&#10;Algorithmes sur graphes pondérés (Dijkstra, Kruskal)&#10;Choix et validation des solutions pour le contexte"
+                    placeholder="Définition des mots clés&#10;Étude des algorithmes de tri&#10;Étude de la complexité algorithmique&#10;Étude des structures de graphes&#10;Algorithmes BFS et DFS&#10;Choix et validation des solutions"
                     required></textarea>
           <div class="form-hint">
-            <span id="nbEtapes" style="color:var(--accent);font-weight:500">0</span>
+            <span id="nbEtapes"
+                  style="color:var(--accent);font-weight:500">0</span>
             étape(s) détectée(s) — chaque étape génèrera ~400 mots
           </div>
+        </div>
+
+        <!-- Mots clés (optionnel, extrait du prosit aller) -->
+        <div class="form-group">
+          <label class="form-label">
+            Mots clés
+            <span style="color:var(--text-muted);font-weight:400">
+              — extraits automatiquement si prosit aller chargé
+            </span>
+          </label>
+          <input type="text" name="mots_cles" id="mots_cles"
+                 class="form-control"
+                 placeholder="graphe, BFS, DFS, complexité, arbre...">
         </div>
 
       </div>
@@ -140,18 +256,22 @@
 
   </div>
 
-  <!-- Colonne droite -->
+  <!-- ── Colonne droite ─────────────────────────────────────────────────── -->
   <div>
 
-    <!-- Upload corbeille / workshop -->
+    <!-- Corbeille / Workshop -->
     <div class="card mb-4">
       <div class="card-header">
         <i data-lucide="upload-cloud" class="header-icon"></i>
-        Corbeille / Workshop (optionnel)
+        Corbeille / Workshop
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">
+          (optionnel)
+        </span>
       </div>
       <div class="card-body">
-        <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
-          Upload la corbeille et/ou le workshop du prosit pour enrichir 
+        <p style="font-size:12.5px;color:var(--text-secondary);
+                  margin-bottom:12px">
+          Upload la corbeille et/ou le workshop du prosit pour enrichir
           le contenu généré par l'IA.
         </p>
         <div id="dropZone2" style="
@@ -165,17 +285,17 @@
              style="width:28px;height:28px;color:var(--text-muted);
                     margin:0 auto 8px;display:block;stroke-width:1.5"></i>
           <div style="font-size:12.5px;color:var(--text-secondary)">
-            Glisse tes PDFs ici ou
+            Glisse tes fichiers ici ou
             <label for="fichiers"
                    style="color:var(--accent);cursor:pointer;font-weight:500">
               parcourir
             </label>
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-            PDF, TXT — plusieurs fichiers acceptés
+            PDF, TXT, MD, DOCX — plusieurs fichiers acceptés
           </div>
           <input type="file" id="fichiers" name="fichiers"
-                 multiple accept=".pdf,.txt,.md"
+                 multiple accept=".pdf,.txt,.md,.markdown,.docx"
                  style="display:none"
                  onchange="onFilesSelected(this)">
         </div>
@@ -212,7 +332,7 @@
         </div>
         <div class="divider"></div>
         <p style="font-size:11.5px;color:var(--text-muted);line-height:1.5">
-          L'IA génère chaque section indépendamment. Tu pourras régénérer 
+          L'IA génère chaque section indépendamment. Tu pourras régénérer
           une section spécifique si nécessaire.
         </p>
       </div>
@@ -244,23 +364,178 @@
 
 {% block scripts %}
 <style>
-@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#dropZoneProsit:hover,
+#dropZoneProsit.drag-over {
+  background: var(--accent-glow) !important;
+  border-color: var(--accent) !important;
+}
 </style>
+
 <script>
-// Compteur d'étapes
+// ── EXTRACTION PROSIT ALLER ───────────────────────────────────────────────────
+
+async function chargerPrositAller(fichier) {
+  if (!fichier) return;
+
+  // Afficher la barre de progression
+  document.getElementById('barreExtraction').style.display = 'block';
+  document.getElementById('recapExtraction').style.display = 'none';
+  document.getElementById('iconeStatut').innerHTML = `
+    <div style="width:28px;height:28px;margin:0 auto 6px;
+                border:2px solid var(--border);
+                border-top-color:var(--accent);border-radius:50%;
+                animation:spin 0.8s linear infinite"></div>
+    <div style="font-size:11.5px;color:var(--text-muted)">Extraction…</div>
+  `;
+
+  // Animation progression
+  let pct = 10;
+  const timer = setInterval(() => {
+    pct = Math.min(pct + 8, 85);
+    document.getElementById('progressExtraction').style.width = pct + '%';
+  }, 200);
+
+  try {
+    const formData = new FormData();
+    formData.append('prosit_aller', fichier);
+
+    const r = await fetch('{{ url_for("cer.extraire_prosit") }}', {
+      method: 'POST',
+      body:   formData
+    });
+    const data = await r.json();
+
+    clearInterval(timer);
+    document.getElementById('progressExtraction').style.width = '100%';
+
+    if (data.ok) {
+      preremplirFormulaire(data.champs);
+      document.getElementById('barreExtraction').style.display = 'none';
+
+      const nb = Object.values(data.champs).filter(v => v && v.trim()).length;
+      document.getElementById('texteRecap').textContent =
+        `✓ ${nb} champ(s) pré-rempli(s) depuis « ${fichier.name} »`;
+      document.getElementById('recapExtraction').style.display = 'block';
+
+      document.getElementById('iconeStatut').innerHTML = `
+        <i data-lucide="check-circle"
+           style="width:28px;height:28px;color:var(--success);
+                  margin:0 auto 6px;display:block"></i>
+        <div style="font-size:11.5px;color:var(--success);font-weight:500">
+          Extrait !
+        </div>
+      `;
+      lucide.createIcons();
+    } else {
+      afficherErreurExtraction(data.erreur || 'Erreur inconnue');
+    }
+  } catch (e) {
+    clearInterval(timer);
+    afficherErreurExtraction(e.message);
+  }
+}
+
+function preremplirFormulaire(champs) {
+  const mapping = {
+    'titre_prosit':  'titre_prosit',
+    'numero_prosit': 'numero_prosit',
+    'contexte':      'contexte',
+    'besoins':       'besoins',
+    'contraintes':   'contraintes',
+    'problematique': 'problematique',
+    'mots_cles':     'mots_cles',
+  };
+
+  for (const [cle, id] of Object.entries(mapping)) {
+    if (champs[cle] && champs[cle].trim()) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.value = champs[cle].trim();
+        // Flash visuel pour signaler le pré-remplissage
+        el.style.transition = 'background 0.5s';
+        el.style.background = 'var(--accent-glow)';
+        setTimeout(() => { el.style.background = ''; }, 1500);
+      }
+    }
+  }
+
+  // Plan d'action
+  if (champs['plan_action'] && champs['plan_action'].trim()) {
+    const pa = document.getElementById('planAction');
+    if (pa) {
+      pa.value = champs['plan_action'].trim();
+      pa.dispatchEvent(new Event('input')); // Mettre à jour le compteur
+      pa.style.transition = 'background 0.5s';
+      pa.style.background = 'var(--accent-glow)';
+      setTimeout(() => { pa.style.background = ''; }, 1500);
+    }
+  }
+}
+
+function afficherErreurExtraction(msg) {
+  document.getElementById('barreExtraction').style.display = 'none';
+  document.getElementById('iconeStatut').innerHTML = `
+    <i data-lucide="alert-circle"
+       style="width:28px;height:28px;color:var(--danger);
+              margin:0 auto 6px;display:block"></i>
+    <div style="font-size:11px;color:var(--danger)">${msg.substring(0,60)}</div>
+  `;
+  lucide.createIcons();
+}
+
+function reinitialiserFormulaire() {
+  const ids = ['titre_prosit','numero_prosit','contexte','besoins',
+               'contraintes','problematique','mots_cles','planAction'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('recapExtraction').style.display = 'none';
+  document.getElementById('iconeStatut').innerHTML = `
+    <i data-lucide="info"
+       style="width:28px;height:28px;color:var(--text-muted);
+              margin:0 auto 6px;display:block"></i>
+    <div style="font-size:11.5px;color:var(--text-muted)">Aucun fichier chargé</div>
+  `;
+  document.getElementById('inputPrositAller').value = '';
+  lucide.createIcons();
+  // Remettre le compteur à 0
+  document.getElementById('nbEtapes').textContent = '0';
+  document.getElementById('estPages').textContent = '~8 pages';
+  document.getElementById('estMots').textContent  = '~3000 mots';
+  document.getElementById('estTemps').textContent = '~2-3 min';
+}
+
+// Drag & drop sur la drop zone prosit aller
+const dz = document.getElementById('dropZoneProsit');
+dz.addEventListener('click', () => document.getElementById('inputPrositAller').click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) chargerPrositAller(f);
+});
+
+// ── COMPTEUR D'ÉTAPES ─────────────────────────────────────────────────────────
+
 document.getElementById('planAction').addEventListener('input', function() {
   const lines = this.value.split('\n').filter(l => l.trim());
   const nb    = lines.length;
   document.getElementById('nbEtapes').textContent = nb;
   document.getElementById('estPages').textContent =
-    `~${Math.max(8, nb * 1.5 + 4)} pages`;
+    `~${Math.max(8, Math.round(nb * 1.5 + 4))} pages`;
   document.getElementById('estMots').textContent =
     `~${nb * 400 + 1500} mots`;
   document.getElementById('estTemps').textContent =
     `~${Math.ceil(nb * 0.4 + 1)} min`;
 });
 
-// Upload fichiers
+// ── UPLOAD CORBEILLE ──────────────────────────────────────────────────────────
+
 function onFilesSelected(input) {
   const info = document.getElementById('filesInfo');
   info.innerHTML = '';
@@ -268,8 +543,10 @@ function onFilesSelected(input) {
     info.innerHTML += `
       <div style="display:flex;align-items:center;gap:8px;
                   background:var(--bg-elevated);border:1px solid var(--border);
-                  border-radius:var(--radius-sm);padding:8px 12px;margin-top:6px">
-        <i data-lucide="file" style="width:14px;height:14px;color:var(--accent)"></i>
+                  border-radius:var(--radius-sm);padding:8px 12px;
+                  margin-top:6px">
+        <i data-lucide="file"
+           style="width:14px;height:14px;color:var(--accent)"></i>
         <span style="font-size:12.5px;color:var(--text-primary)">${f.name}</span>
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto">
           ${(f.size/1024).toFixed(0)} KB
@@ -283,7 +560,8 @@ document.getElementById('dropZone2').addEventListener('click', () => {
   document.getElementById('fichiers').click();
 });
 
-// Submit
+// ── SUBMIT ────────────────────────────────────────────────────────────────────
+
 document.getElementById('formCER').addEventListener('submit', () => {
   document.getElementById('btnCreer').style.display     = 'none';
   document.getElementById('loadingState').style.display = 'block';

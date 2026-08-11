@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+ENV FLASK_APP=run.py
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
@@ -28,8 +30,7 @@ COPY . .
 # Création du dossier pour la base SQLite
 RUN mkdir -p instance
 
-RUN mkdir -p instance
-
 EXPOSE 5000
 
-CMD ["python", "run.py"]
+# Applique les migrations (flask db upgrade) avant de démarrer le serveur
+CMD ["sh", "-c", "flask db upgrade && python run.py"]

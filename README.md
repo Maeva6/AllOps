@@ -83,7 +83,7 @@ application.
 | Domaine | Techno |
 |---|---|
 | Backend | Python 3.12, Flask 3.1, Flask-SQLAlchemy |
-| Base de données | SQLite |
+| Base de données | SQLite, migrations via Flask-Migrate (Alembic) |
 | Frontend | HTML/CSS/JS natif, icônes [Lucide](https://lucide.dev) |
 | IA | Groq (Llama), Google Gemini |
 | Génération de documents | python-docx, fpdf2, PyMuPDF, LaTeX (TeX Live) |
@@ -130,6 +130,33 @@ python run.py
 > TeX Live, installés automatiquement dans l'image Docker (voir
 > [Dockerfile](Dockerfile)). En local, il faut les installer soi-même pour
 > profiter de ces exports.
+
+### Base de données et migrations
+
+Le schéma est géré par [Flask-Migrate](https://flask-migrate.readthedocs.io)
+(Alembic). Avec Docker, `flask db upgrade` s'exécute automatiquement au
+démarrage du conteneur (voir le `CMD` du [Dockerfile](Dockerfile)) : rien à
+faire de plus.
+
+En local, après l'installation :
+
+```bash
+flask db upgrade
+```
+
+Après toute modification d'un modèle dans `app/models.py`, génère une
+nouvelle migration puis applique-la :
+
+```bash
+flask db migrate -m "Description du changement"
+flask db upgrade
+```
+
+> Si tu avais déjà une base `instance/allops.db` créée avant l'introduction
+> des migrations (schéma créé via `db.create_all()`), il faut d'abord la
+> faire adopter par Alembic sans rejouer les créations de table :
+> `flask db stamp head`. Ensuite seulement, les futures migrations
+> s'appliqueront normalement avec `flask db upgrade`.
 
 ---
 
@@ -183,9 +210,10 @@ AllOps/
 │   │   ├── correction.py    # Module Correction IA
 │   │   ├── qa.py            # Module Questions de cours
 │   │   └── detente.py       # Mini-jeux
-│   ├── services/             # Logique métier (génération IA, exports...)
-│   ├── static/                # Assets statiques
+│   ├── services/             # Logique métier (génération IA, exports, extraction...)
+│   ├── static/                # Assets statiques (CSS, JS, polices, Lucide)
 │   └── templates/             # Templates Jinja2
+├── migrations/                # Migrations Alembic (Flask-Migrate)
 ├── tests/                    # Tests automatisés (pytest)
 ├── .github/workflows/ci.yml  # Pipeline CI/CD
 ├── Dockerfile
@@ -210,12 +238,16 @@ s'exécute sur chaque push/PR vers `main` et `develop`, en 3 jobs :
 ## Roadmap / améliorations envisagées
 
 - [ ] Authentification multi-utilisateurs (le projet est actuellement mono-utilisateur)
-- [ ] Externaliser le CSS de `base.html` (actuellement en `<style>` inline) vers un fichier statique versionné et minifiable
-- [ ] Auto-héberger les icônes Lucide et la police Google Fonts pour ne plus dépendre d'un CDN externe au runtime
-- [ ] Tests end-to-end sur les modules IA (CER, révision, correction, QA), aujourd'hui non couverts par `tests/`
-- [ ] Gestion d'erreurs plus explicite quand une clé API IA est absente ou invalide (message utilisateur au lieu d'une erreur silencieuse)
-- [ ] Migrations de base de données via Alembic/Flask-Migrate plutôt que `db.create_all()`
 - [ ] Mode clair/sombre persistant côté serveur (actuellement seulement en `localStorage`)
+- [ ] Étendre la couverture de tests IA (CER, révision, correction, QA) aux cas d'erreur réseau/quota réels, au-delà des mocks
+
+Déjà fait :
+- [x] CSS externalisé (`app/static/css/app.css`) plutôt qu'un `<style>` inline dans `base.html`
+- [x] Icônes Lucide et polices Google Fonts auto-hébergées (`app/static/js`, `app/static/fonts`) — plus de dépendance CDN au runtime
+- [x] Erreurs IA (Groq) traduites en messages lisibles via `app/services/ai_errors.py`, au lieu de traces brutes
+- [x] Migrations de base de données via Flask-Migrate (`migrations/`) plutôt que `db.create_all()`
+- [x] Tests pour les modules IA (CER, révision, correction, QA), appels externes mockés
+- [x] `routes/cer.py` allégé : logique d'extraction/génération Word déplacée vers `services/cer_service.py`
 
 ---
 

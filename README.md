@@ -40,6 +40,11 @@ application.
 
 ## Fonctionnalités
 
+### Tableau de bord
+- Vue d'ensemble de l'activité (certifications, CER, révisions...)
+- Bannière de rappel pour les certifications dont la deadline approche (≤ 30 jours)
+- Recherche globale (`/recherche`) sur les certifications, CER, révisions, corrections et questions de cours
+
 ### Automatisation de fichiers
 - Renommage en masse selon un pattern
 - Fusion de plusieurs PDFs en un seul document
@@ -54,22 +59,32 @@ application.
 - Alertes de deadline
 - Gestion des ressources d'apprentissage liées à chaque certification
 
+### Projets — planification & journal d'activité
+- Suivi de projets avec statut, priorité et échéance
+- Tableau **Kanban** par projet (À faire / En cours / Terminé)
+- **Journal d'activité** : enregistrement du temps passé (titre, durée, catégorie), avec ou sans lien vers un projet
+- Dashboard temps : total du jour/de la semaine, répartition par catégorie
+
 ### CER (Compte-Rendu d'Étude / rapports type PROSIT)
 - Extraction automatique du contenu d'un fichier source (page de garde, sections)
-- Génération de sections assistée par IA
+- Génération de sections assistée par IA, en **streaming** (réponse affichée au fil de la génération)
 - Export en LaTeX, Word (.docx) et PDF
+- Partage d'un lien public en lecture seule
 
 ### Révision IA
-- Génération de fiches de cours à partir d'un contenu source
+- Génération de fiches de cours à partir d'un contenu source, en streaming
+- **Flashcards** avec répétition espacée (système de Leitner, 5 boîtes)
 - Génération de quiz de révision par niveau de difficulté
+- Suivi de progression : évolution des scores, moyenne par domaine
 - Historique des sessions et des scores
+- Partage d'un lien public en lecture seule
 
 ### Correction IA
 - Soumission d'un devoir et correction automatique assistée par IA
 - Export du résultat en LaTeX, Word et PDF
 
 ### Questions de cours (QA)
-- Assistant conversationnel pour poser des questions de cours
+- Assistant conversationnel pour poser des questions de cours, réponses en streaming
 - Historique des échanges, consultable et supprimable
 
 ### Coin détente
@@ -199,16 +214,20 @@ AllOps/
 ├── app/
 │   ├── __init__.py          # Application factory
 │   ├── config.py            # Configuration (variables d'env)
-│   ├── extensions.py        # Extensions Flask (SQLAlchemy)
+│   ├── extensions.py        # Extensions Flask (SQLAlchemy, Migrate)
+│   ├── logging_config.py    # Configuration des logs (fichier + stdout)
 │   ├── models.py            # Modèles de base de données
 │   ├── routes/
 │   │   ├── main.py          # Tableau de bord
 │   │   ├── files.py         # Module Fichiers
 │   │   ├── tracker.py       # Module Certifications
+│   │   ├── projets.py       # Module Projets (kanban + journal d'activité)
 │   │   ├── cer.py           # Module CER
-│   │   ├── revision.py      # Module Révision IA
+│   │   ├── revision.py      # Module Révision IA (+ flashcards, progression)
 │   │   ├── correction.py    # Module Correction IA
 │   │   ├── qa.py            # Module Questions de cours
+│   │   ├── recherche.py     # Recherche globale
+│   │   ├── partage.py       # Liens de partage publics (CER, révision)
 │   │   └── detente.py       # Mini-jeux
 │   ├── services/             # Logique métier (génération IA, exports, extraction...)
 │   ├── static/                # Assets statiques (CSS, JS, polices, Lucide)
@@ -227,11 +246,12 @@ AllOps/
 ## CI/CD
 
 Le pipeline GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml))
-s'exécute sur chaque push/PR vers `main` et `develop`, en 3 jobs :
+s'exécute sur chaque push/PR vers `main` et `develop`, en 4 jobs :
 
 1. **Tests** — exécution de la suite pytest + rapport de couverture
 2. **Qualité du code** — analyse flake8 (erreurs critiques de syntaxe/imports)
-3. **Build Docker** — construction de l'image et vérification qu'elle démarre correctement
+3. **Migrations DB** — applique les migrations sur une base neuve puis `flask db check`, pour détecter tout modèle modifié sans migration associée
+4. **Build Docker** — construction de l'image et vérification qu'elle démarre correctement
 
 ---
 
@@ -240,6 +260,8 @@ s'exécute sur chaque push/PR vers `main` et `develop`, en 3 jobs :
 - [ ] Authentification multi-utilisateurs (le projet est actuellement mono-utilisateur)
 - [ ] Mode clair/sombre persistant côté serveur (actuellement seulement en `localStorage`)
 - [ ] Étendre la couverture de tests IA (CER, révision, correction, QA) aux cas d'erreur réseau/quota réels, au-delà des mocks
+- [ ] Minuteur start/stop pour le journal d'activité (actuellement saisie manuelle de la durée)
+- [ ] Lier les tâches de projet aux Certifications / CER existants
 
 Déjà fait :
 - [x] CSS externalisé (`app/static/css/app.css`) plutôt qu'un `<style>` inline dans `base.html`
@@ -248,6 +270,17 @@ Déjà fait :
 - [x] Migrations de base de données via Flask-Migrate (`migrations/`) plutôt que `db.create_all()`
 - [x] Tests pour les modules IA (CER, révision, correction, QA), appels externes mockés
 - [x] `routes/cer.py` allégé : logique d'extraction/génération Word déplacée vers `services/cer_service.py`
+- [x] Réponses IA en streaming (CER, révision, QA) plutôt qu'une attente bloquante
+- [x] Anti-spam / garde de concurrence sur les appels IA (`ai_guard`)
+- [x] Pagination réelle sur les listes (certifications, CER, révisions, corrections, historique fichiers)
+- [x] Logs structurés (fichier + stdout) via `app/logging_config.py`
+- [x] Job CI dédié à la vérification des migrations (`flask db check`)
+- [x] Rappels de deadlines sur le tableau de bord
+- [x] Flashcards à répétition espacée (système de Leitner)
+- [x] Recherche globale multi-modules
+- [x] Partage de CER et de fiches de révision via lien public en lecture seule
+- [x] Suivi de progression des quiz de révision (graphique, moyenne par domaine)
+- [x] Module Projets : suivi kanban + journal d'activité avec durée
 
 ---
 

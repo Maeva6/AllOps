@@ -32,6 +32,59 @@
   </div>
 </div>
 
+<!-- Minuteur -->
+<div class="card mb-4">
+  <div class="card-header">
+    <i data-lucide="timer" class="header-icon"></i>
+    Minuteur
+  </div>
+  <div class="card-body">
+    <form id="timerForm" action="{{ url_for('projets.ajouter_activite') }}" method="POST">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px">
+        <div class="form-group mb-0">
+          <label class="form-label">Titre *</label>
+          <input type="text" name="titre" id="timerTitre" class="form-control"
+                 placeholder="Ex : Séance de révision">
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">Catégorie</label>
+          <select name="categorie" id="timerCategorie" class="form-control">
+            {% for cat in categories %}
+              <option {% if cat == 'Autre' %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">Projet lié</label>
+          <select name="projet_id" id="timerProjet" class="form-control">
+            <option value="">— Aucun —</option>
+            {% for p in projets %}
+              <option value="{{ p.id }}">{{ p.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <input type="hidden" name="duree_minutes" id="timerDuree">
+
+      <div class="flex items-center justify-between mt-3">
+        <div class="font-mono" id="timerAffichage" style="font-size:24px;color:var(--accent)">00:00:00</div>
+        <div class="flex gap-2">
+          <button type="button" id="timerDemarrer" class="btn btn-primary">
+            <i data-lucide="play"></i> Démarrer
+          </button>
+          <button type="submit" id="timerArreter" class="btn btn-danger" style="display:none">
+            <i data-lucide="square"></i> Arrêter et enregistrer
+          </button>
+        </div>
+      </div>
+      <p id="timerErreur" class="text-xs" style="color:var(--danger);display:none;margin-top:6px">
+        Renseigne un titre avant de démarrer le minuteur.
+      </p>
+    </form>
+  </div>
+</div>
+
 <!-- Ajouter une activité -->
 <div class="card mb-4">
   <div class="card-header">
@@ -152,4 +205,96 @@
   </table>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const STOCKAGE_CLE = 'allops-timer';
+
+  const form        = document.getElementById('timerForm');
+  const titreInput  = document.getElementById('timerTitre');
+  const catSelect    = document.getElementById('timerCategorie');
+  const projetSelect = document.getElementById('timerProjet');
+  const dureeInput   = document.getElementById('timerDuree');
+  const affichage    = document.getElementById('timerAffichage');
+  const btnDemarrer  = document.getElementById('timerDemarrer');
+  const btnArreter   = document.getElementById('timerArreter');
+  const erreur       = document.getElementById('timerErreur');
+
+  let intervalId = null;
+
+  function formaterDuree(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+    const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+    const s = String(totalSec % 60).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  }
+
+  function tick(debut) {
+    affichage.textContent = formaterDuree(Date.now() - debut);
+  }
+
+  function demarrerAffichage(debut) {
+    tick(debut);
+    intervalId = setInterval(() => tick(debut), 1000);
+  }
+
+  function passerEnCours() {
+    btnDemarrer.style.display = 'none';
+    btnArreter.style.display  = 'inline-flex';
+  }
+
+  // Reprendre un minuteur déjà lancé (navigation entre pages, rechargement)
+  const enCours = JSON.parse(localStorage.getItem(STOCKAGE_CLE) || 'null');
+  if (enCours) {
+    titreInput.value  = enCours.titre;
+    catSelect.value    = enCours.categorie;
+    if (projetSelect) projetSelect.value = enCours.projetId || '';
+    passerEnCours();
+    demarrerAffichage(enCours.debut);
+  }
+
+  btnDemarrer.addEventListener('click', () => {
+    const titre = titreInput.value.trim();
+    if (!titre) {
+      erreur.style.display = 'block';
+      titreInput.focus();
+      return;
+    }
+    erreur.style.display = 'none';
+
+    const debut = Date.now();
+    localStorage.setItem(STOCKAGE_CLE, JSON.stringify({
+      debut,
+      titre,
+      categorie: catSelect.value,
+      projetId: projetSelect ? projetSelect.value : '',
+    }));
+
+    passerEnCours();
+    demarrerAffichage(debut);
+  });
+
+  form.addEventListener('submit', (evt) => {
+    if (intervalId === null) {
+      // Le minuteur n'a pas été démarré (ex : Entrée pressée dans le titre) —
+      // rien à enregistrer sans durée calculée.
+      evt.preventDefault();
+      return;
+    }
+
+    clearInterval(intervalId);
+    intervalId = null;
+
+    const donnees = JSON.parse(localStorage.getItem(STOCKAGE_CLE) || 'null');
+    if (donnees) {
+      const minutes = Math.max(1, Math.round((Date.now() - donnees.debut) / 60000));
+      dureeInput.value = minutes;
+    }
+    localStorage.removeItem(STOCKAGE_CLE);
+  });
+});
+</script>
 {% endblock %}

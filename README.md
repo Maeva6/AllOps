@@ -44,6 +44,7 @@ application.
 - Vue d'ensemble de l'activité (certifications, CER, révisions...)
 - Bannière de rappel pour les certifications dont la deadline approche (≤ 30 jours)
 - Recherche globale (`/recherche`) sur les certifications, CER, révisions, corrections et questions de cours
+- Thème clair/sombre persisté côté serveur (même préférence sur tous les appareils)
 
 ### Automatisation de fichiers
 - Renommage en masse selon un pattern
@@ -62,7 +63,9 @@ application.
 ### Projets — planification & journal d'activité
 - Suivi de projets avec statut, priorité et échéance
 - Tableau **Kanban** par projet (À faire / En cours / Terminé)
+- Tâches liables à une **Certification** ou à un **CER** existant
 - **Journal d'activité** : enregistrement du temps passé (titre, durée, catégorie), avec ou sans lien vers un projet
+- **Minuteur start/stop** en plus de la saisie manuelle, avec reprise automatique si on change de page
 - Dashboard temps : total du jour/de la semaine, répartition par catégorie
 
 ### CER (Compte-Rendu d'Étude / rapports type PROSIT)
@@ -228,6 +231,7 @@ AllOps/
 │   │   ├── qa.py            # Module Questions de cours
 │   │   ├── recherche.py     # Recherche globale
 │   │   ├── partage.py       # Liens de partage publics (CER, révision)
+│   │   ├── parametres.py    # Préférences persistées (thème)
 │   │   └── detente.py       # Mini-jeux
 │   ├── services/             # Logique métier (génération IA, exports, extraction...)
 │   ├── static/                # Assets statiques (CSS, JS, polices, Lucide)
@@ -258,12 +262,12 @@ s'exécute sur chaque push/PR vers `main` et `develop`, en 4 jobs :
 ## Roadmap / améliorations envisagées
 
 - [ ] Authentification multi-utilisateurs (le projet est actuellement mono-utilisateur)
-- [ ] Mode clair/sombre persistant côté serveur (actuellement seulement en `localStorage`)
-- [ ] Étendre la couverture de tests IA (CER, révision, correction, QA) aux cas d'erreur réseau/quota réels, au-delà des mocks
-- [ ] Minuteur start/stop pour le journal d'activité (actuellement saisie manuelle de la durée)
-- [ ] Lier les tâches de projet aux Certifications / CER existants
 
 Déjà fait :
+- [x] Mode clair/sombre persistant côté serveur (modèle `Parametre`, plus seulement en `localStorage`) — la préférence est la même sur tous les appareils
+- [x] Couverture de tests IA étendue aux cas d'erreur réseau/quota réels (`tests/test_ai_errors.py`), avec de vraies classes d'exception du SDK Groq (`AuthenticationError`, `RateLimitError`, `APIConnectionError`...) plutôt que des mocks approximatifs
+- [x] Minuteur start/stop pour le journal d'activité (en plus de la saisie manuelle de la durée), avec reprise automatique si on quitte la page
+- [x] Tâches de projet liables à une Certification ou à un CER existant
 - [x] CSS externalisé (`app/static/css/app.css`) plutôt qu'un `<style>` inline dans `base.html`
 - [x] Icônes Lucide et polices Google Fonts auto-hébergées (`app/static/js`, `app/static/fonts`) — plus de dépendance CDN au runtime
 - [x] Erreurs IA (Groq) traduites en messages lisibles via `app/services/ai_errors.py`, au lieu de traces brutes

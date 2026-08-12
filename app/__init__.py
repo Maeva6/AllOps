@@ -17,6 +17,8 @@ from app.routes.recherche import recherche_bp
 from app.routes.partage import partage_bp
 from app.routes.projets import projets_bp
 from app.models import Projet, Tache, ActiviteJournaliere
+from app.routes.parametres import parametres_bp
+from app.models import Parametre
 from datetime import datetime, timezone
 
 def create_app(config_class=Config):
@@ -40,10 +42,15 @@ def create_app(config_class=Config):
     app.register_blueprint(recherche_bp)
     app.register_blueprint(partage_bp)
     app.register_blueprint(projets_bp)
+    app.register_blueprint(parametres_bp)
 
 
     @app.context_processor
     def inject_now():
         return {'now': datetime.now(timezone.utc)}
+
+    @app.context_processor
+    def inject_theme():
+        return {'theme_actuel': Parametre.get().theme}
 
     return app

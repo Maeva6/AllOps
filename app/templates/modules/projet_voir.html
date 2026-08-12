@@ -44,20 +44,39 @@
 <!-- Ajouter une tâche -->
 <div class="card mb-4">
   <div class="card-body">
-    <form action="{{ url_for('projets.ajouter_tache', id=projet.id) }}" method="POST"
-          class="flex gap-2" style="align-items:flex-end">
-      <div class="form-group mb-0" style="flex:1">
+    <form action="{{ url_for('projets.ajouter_tache', id=projet.id) }}" method="POST">
+      <div class="form-group">
         <label class="form-label">Nouvelle tâche</label>
         <input type="text" name="titre" class="form-control"
                placeholder="Ex : Rédiger la synthèse du PROSIT" required>
       </div>
-      <div class="form-group mb-0">
-        <label class="form-label">Échéance</label>
-        <input type="date" name="echeance" class="form-control">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:flex-end">
+        <div class="form-group mb-0">
+          <label class="form-label">Échéance</label>
+          <input type="date" name="echeance" class="form-control">
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">Lier à une certification</label>
+          <select name="certification_id" class="form-control">
+            <option value="">— Aucune —</option>
+            {% for c in certifications %}
+              <option value="{{ c.id }}">{{ c.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">Lier à un CER</label>
+          <select name="cer_id" class="form-control">
+            <option value="">— Aucun —</option>
+            {% for s in sessions_cer %}
+              <option value="{{ s.id }}">{{ s.titre_prosit }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="plus"></i> Ajouter
+        </button>
       </div>
-      <button type="submit" class="btn btn-primary">
-        <i data-lucide="plus"></i> Ajouter
-      </button>
     </form>
   </div>
 </div>
@@ -84,6 +103,18 @@
           <i data-lucide="calendar" style="width:11px;height:11px"></i>
           {{ tache.echeance.strftime('%d/%m/%Y') }}
         </div>
+        {% endif %}
+        {% if tache.certification %}
+        <a href="{{ url_for('tracker.modifier', id=tache.certification.id) }}"
+           class="badge badge-accent mb-1" style="text-decoration:none">
+          <i data-lucide="award"></i> {{ tache.certification.nom }}
+        </a>
+        {% endif %}
+        {% if tache.cer %}
+        <a href="{{ url_for('cer.voir', id=tache.cer.id) }}"
+           class="badge badge-accent mb-1" style="text-decoration:none">
+          <i data-lucide="file-text"></i> {{ tache.cer.titre_prosit }}
+        </a>
         {% endif %}
         <div class="kanban-card-footer">
           <form action="{{ url_for('projets.changer_statut_tache', tid=tache.id) }}" method="POST">

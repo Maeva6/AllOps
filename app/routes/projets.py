@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, abort
 from app.extensions import db
-from app.models import Projet, Tache, ActiviteJournaliere
+from app.models import Projet, Tache, ActiviteJournaliere, Certification, SessionCER
 from datetime import datetime, timedelta, timezone
 
 UTC = timezone.utc
@@ -116,10 +116,15 @@ def voir(id):
         'termine':  [t for t in projet.taches if t.statut == 'termine'],
     }
 
+    certifications = Certification.query.order_by(Certification.nom).all()
+    sessions_cer   = SessionCER.query.order_by(SessionCER.titre_prosit).all()
+
     return render_template('modules/projet_voir.html',
                            title=projet.nom,
                            projet=projet,
-                           colonnes=colonnes)
+                           colonnes=colonnes,
+                           certifications=certifications,
+                           sessions_cer=sessions_cer)
 
 
 # ─── Ajouter une tâche ──────────────────────────────────────────────────────
@@ -129,12 +134,22 @@ def ajouter_tache(id):
 
     titre = request.form.get('titre', '').strip()
     if titre:
+        certification_id = request.form.get('certification_id', type=int)
+        if certification_id and not db.session.get(Certification, certification_id):
+            certification_id = None
+
+        cer_id = request.form.get('cer_id', type=int)
+        if cer_id and not db.session.get(SessionCER, cer_id):
+            cer_id = None
+
         ordre_max = max([t.ordre for t in projet.taches], default=0)
         tache = Tache(
-            projet_id = id,
-            titre     = titre,
-            echeance  = _parse_date(request.form.get('echeance')),
-            ordre     = ordre_max + 1,
+            projet_id        = id,
+            titre            = titre,
+            echeance         = _parse_date(request.form.get('echeance')),
+            ordre            = ordre_max + 1,
+            certification_id = certification_id,
+            cer_id           = cer_id,
         )
         db.session.add(tache)
         db.session.commit()

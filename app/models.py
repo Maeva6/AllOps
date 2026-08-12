@@ -320,14 +320,19 @@ class Projet(db.Model):
 class Tache(db.Model):
     __tablename__ = 'taches'
 
-    id         = db.Column(db.Integer, primary_key=True)
-    projet_id  = db.Column(db.Integer, db.ForeignKey('projets.id'), nullable=False)
-    titre      = db.Column(db.String(300), nullable=False)
-    statut     = db.Column(db.String(20),  default='a_faire')
+    id               = db.Column(db.Integer, primary_key=True)
+    projet_id        = db.Column(db.Integer, db.ForeignKey('projets.id'), nullable=False)
+    titre            = db.Column(db.String(300), nullable=False)
+    statut           = db.Column(db.String(20),  default='a_faire')
     # a_faire / en_cours / termine
-    echeance   = db.Column(db.Date,        nullable=True)
-    ordre      = db.Column(db.Integer,     default=0)
-    created_at = db.Column(db.DateTime,    default=lambda: datetime.now(UTC))
+    echeance         = db.Column(db.Date,        nullable=True)
+    ordre            = db.Column(db.Integer,     default=0)
+    certification_id = db.Column(db.Integer, db.ForeignKey('certifications.id'), nullable=True)
+    cer_id           = db.Column(db.Integer, db.ForeignKey('sessions_cer.id'), nullable=True)
+    created_at       = db.Column(db.DateTime,    default=lambda: datetime.now(UTC))
+
+    certification = db.relationship('Certification', backref=db.backref('taches_liees', lazy=True))
+    cer           = db.relationship('SessionCER', backref=db.backref('taches_liees', lazy=True))
 
     def __repr__(self):
         return f'<Tache {self.titre[:40]}>'
@@ -352,3 +357,24 @@ class ActiviteJournaliere(db.Model):
 
     def __repr__(self):
         return f'<ActiviteJournaliere {self.titre[:40]}>'
+
+
+# ─── Modèle : Paramètre (préférences globales, persistées côté serveur) ───────
+class Parametre(db.Model):
+    __tablename__ = 'parametres'
+
+    id    = db.Column(db.Integer, primary_key=True)
+    theme = db.Column(db.String(10), default='dark')  # dark / light
+
+    @classmethod
+    def get(cls):
+        """Renvoie la ligne singleton des paramètres, en la créant si absente."""
+        parametre = db.session.get(cls, 1)
+        if parametre is None:
+            parametre = cls(id=1, theme='dark')
+            db.session.add(parametre)
+            db.session.commit()
+        return parametre
+
+    def __repr__(self):
+        return f'<Parametre theme={self.theme}>'

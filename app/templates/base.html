@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="fr" data-theme="{{ theme_actuel }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -155,6 +155,9 @@
     // ── Theme toggle ───────────────────────────────────────────────────
     // Cablé en premier et indépendamment des icônes : si le CDN Lucide
     // est bloqué/lent/indisponible, le bouton doit continuer à marcher.
+    // Le thème est rendu côté serveur (attribut data-theme déjà posé par
+    // Jinja depuis app.models.Parametre) : pas de flash au chargement, et
+    // la préférence est la même sur tous les appareils/navigateurs.
     const root        = document.documentElement;
     const themeToggle = document.getElementById('themeToggle');
     const iconLight   = document.getElementById('iconLight');
@@ -165,9 +168,7 @@
       catch (e) { console.warn('Lucide indisponible :', e); }
     }
 
-    function applyTheme(theme) {
-      root.setAttribute('data-theme', theme);
-      localStorage.setItem('allops-theme', theme);
+    function updateIcons(theme) {
       if (theme === 'light') {
         iconLight.style.display = 'block';
         iconDark.style.display  = 'none';
@@ -177,13 +178,21 @@
       }
     }
 
-    // Charger thème sauvegardé
-    const saved = localStorage.getItem('allops-theme') || 'dark';
-    applyTheme(saved);
+    function persistTheme(theme) {
+      fetch('/parametres/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme }),
+      }).catch(() => {});
+    }
+
+    updateIcons(root.getAttribute('data-theme'));
 
     themeToggle.addEventListener('click', () => {
-      const current = root.getAttribute('data-theme');
-      applyTheme(current === 'dark' ? 'light' : 'dark');
+      const nouveau = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', nouveau);
+      updateIcons(nouveau);
+      persistTheme(nouveau);
     });
 
     // ── Sidebar mobile ─────────────────────────────────────────────────

@@ -1,6 +1,7 @@
+import json
 import pytest
 from app.extensions import db
-from app.models import Projet, Tache, ActiviteJournaliere
+from app.models import Projet, Tache, ActiviteJournaliere, Certification, SessionCER
 
 
 @pytest.fixture
@@ -16,6 +17,29 @@ def sample_projet(app):
         db.session.add(projet)
         db.session.commit()
         return projet.id
+
+
+@pytest.fixture
+def sample_certification(app):
+    with app.app_context():
+        cert = Certification(nom='AWS Cloud Practitioner', organisme='AWS', categorie='Cloud')
+        db.session.add(cert)
+        db.session.commit()
+        return cert.id
+
+
+@pytest.fixture
+def sample_cer_session(app):
+    with app.app_context():
+        cer = SessionCER(
+            titre_prosit='Prosit Test — Liaison',
+            etudiant='Jean Dupont',
+            contexte='Contexte', besoins='Besoins', problematique='Problématique',
+            plan_action=json.dumps(['Étape 1']),
+        )
+        db.session.add(cer)
+        db.session.commit()
+        return cer.id
 
 
 # ─── Tests : CRUD Projets ──────────────────────────────────────────────────
@@ -203,3 +227,69 @@ class TestJournal:
         r = client.get('/projets/journal')
         assert r.status_code == 200
         assert '1h30' in r.data.decode()
+
+
+# ─── Tests : liaison des tâches aux Certifications / CER ───────────────────
+class TestLiaisonTachesCertificationsCER:
+
+    def test_ajouter_tache_liee_a_une_certification(self, client, sample_projet,
+                                                      sample_certification, app):
+        r = client.post(f'/projets/{sample_projet}/taches/ajouter', data={
+            'titre': 'Réviser pour AWS',
+            'certification_id': str(sample_certification),
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            tache = Tache.query.filter_by(projet_id=sample_projet).first()
+            assert tache.certification_id == sample_certification
+            assert tache.certification.nom == 'AWS Cloud Practitioner'
+
+    def test_ajouter_tache_liee_a_un_cer(self, client, sample_projet,
+                                          sample_cer_session, app):
+        r = client.post(f'/projets/{sample_projet}/taches/ajouter', data={
+            'titre': 'Finaliser le CER',
+            'cer_id': str(sample_cer_session),
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            tache = Tache.query.filter_by(projet_id=sample_projet).first()
+            assert tache.cer_id == sample_cer_session
+            assert tache.cer.titre_prosit == 'Prosit Test — Liaison'
+
+    def test_ajouter_tache_certification_invalide_ignoree(self, client, sample_projet, app):
+        r = client.post(f'/projets/{sample_projet}/taches/ajouter', data={
+            'titre': 'Tâche sans lien valide',
+            'certification_id': '9999',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            tache = Tache.query.filter_by(projet_id=sample_projet).first()
+            assert tache.certification_id is None
+
+    def test_ajouter_tache_sans_lien(self, client, sample_projet, app):
+        r = client.post(f'/projets/{sample_projet}/taches/ajouter', data={
+            'titre': 'Tâche libre',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            tache = Tache.query.filter_by(projet_id=sample_projet).first()
+            assert tache.certification_id is None
+            assert tache.cer_id is None
+
+    def test_page_projet_propose_les_certifications_et_cer(self, client, sample_projet,
+                                                             sample_certification,
+                                                             sample_cer_session):
+        r = client.get(f'/projets/{sample_projet}')
+        assert r.status_code == 200
+        html = r.data.decode()
+        assert 'AWS Cloud Practitioner' in html
+        assert 'Prosit Test — Liaison' in html
+
+    def test_kanban_affiche_le_lien_certification(self, client, sample_projet,
+                                                    sample_certification, app):
+        client.post(f'/projets/{sample_projet}/taches/ajouter', data={
+            'titre': 'Réviser pour AWS',
+            'certification_id': str(sample_certification),
+        })
+        r = client.get(f'/projets/{sample_projet}')
+        assert 'AWS Cloud Practitioner' in r.data.decode()

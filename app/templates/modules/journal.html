@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Projets / Journal d'activité{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Journal d'activité</h1>
+    <p>Suis le temps passé sur tes cours, projets et certifications</p>
+  </div>
+  <a href="{{ url_for('projets.index') }}" class="btn btn-secondary">
+    <i data-lucide="kanban-square"></i>
+    Voir les projets
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Aujourd'hui</span>
+      <i data-lucide="clock" class="stat-icon text-accent"></i>
+    </div>
+    <div class="stat-value text-accent">{{ total_jour // 60 }}h{{ '%02d'|format(total_jour % 60) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Cette semaine</span>
+      <i data-lucide="calendar-days" class="stat-icon text-success"></i>
+    </div>
+    <div class="stat-value text-success">{{ total_semaine // 60 }}h{{ '%02d'|format(total_semaine % 60) }}</div>
+  </div>
+</div>
+
+<!-- Ajouter une activité -->
+<div class="card mb-4">
+  <div class="card-header">
+    <i data-lucide="plus-circle" class="header-icon"></i>
+    Enregistrer une activité
+  </div>
+  <div class="card-body">
+    <form action="{{ url_for('projets.ajouter_activite') }}" method="POST">
+      <div class="form-group">
+        <label class="form-label">Titre *</label>
+        <input type="text" name="titre" class="form-control"
+               placeholder="Ex : Révision du cours de thermodynamique" required>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Durée (minutes) *</label>
+          <input type="number" name="duree_minutes" class="form-control"
+                 min="1" step="1" placeholder="45" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Catégorie</label>
+          <select name="categorie" class="form-control">
+            {% for cat in categories %}
+              <option {% if cat == 'Autre' %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" name="date_activite" class="form-control" value="{{ today }}">
+        </div>
+      </div>
+
+      {% if projets %}
+      <div class="form-group">
+        <label class="form-label">Projet lié (optionnel)</label>
+        <select name="projet_id" class="form-control">
+          <option value="">— Aucun —</option>
+          {% for p in projets %}
+            <option value="{{ p.id }}">{{ p.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="flex justify-end">
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="plus"></i> Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Répartition par catégorie (semaine) -->
+{% if repartition %}
+<div class="card mb-4">
+  <div class="card-header">
+    <i data-lucide="pie-chart" class="header-icon"></i>
+    Répartition cette semaine
+  </div>
+  <div class="card-body flex flex-col gap-2">
+    {% for cat, minutes in repartition.items() %}
+    {% set pct = (minutes / total_semaine * 100) | round | int if total_semaine else 0 %}
+    <div>
+      <div class="flex justify-between mb-1">
+        <span class="text-sm">{{ cat }}</span>
+        <span class="text-sm font-medium">{{ minutes // 60 }}h{{ '%02d'|format(minutes % 60) }} · {{ pct }}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:{{ pct }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Historique -->
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Titre</th>
+        <th>Catégorie</th>
+        <th>Projet</th>
+        <th>Durée</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in activites %}
+      <tr>
+        <td class="muted">{{ a.date_activite.strftime('%d/%m/%Y') }}</td>
+        <td>{{ a.titre }}</td>
+        <td><span class="badge badge-muted">{{ a.categorie }}</span></td>
+        <td class="muted">
+          {% if a.projet %}
+            <a href="{{ url_for('projets.voir', id=a.projet.id) }}">{{ a.projet.nom }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td class="font-mono">{{ a.duree_minutes // 60 }}h{{ '%02d'|format(a.duree_minutes % 60) }}</td>
+        <td>
+          <form action="{{ url_for('projets.supprimer_activite', id=a.id) }}" method="POST"
+                onsubmit="return confirm('Supprimer cette activité ?')">
+            <button class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted" style="padding:32px;text-align:center">
+        Aucune activité enregistrée pour l'instant
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

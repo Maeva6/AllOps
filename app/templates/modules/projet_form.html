@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block breadcrumb %}
+  {{ "Modifier" if projet else "Nouveau" }} projet
+{% endblock %}
+
+{% block content %}
+
+<div class="flex items-center gap-3 mb-4">
+  <a href="{{ url_for('projets.index') }}" class="btn btn-secondary btn-sm">
+    <i data-lucide="arrow-left"></i>
+    Retour
+  </a>
+  <h1 style="font-size:18px;font-weight:600;margin:0">
+    {{ "Modifier" if projet else "Nouveau" }} projet
+  </h1>
+</div>
+
+<div style="max-width:680px;">
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+
+        <div class="form-group">
+          <label class="form-label">Nom du projet *</label>
+          <input type="text" name="nom" class="form-control"
+                 style="font-size:15px"
+                 placeholder="PROSIT n°4 — Automatisation industrielle"
+                 value="{{ projet.nom if projet else '' }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3"
+                    placeholder="Objectif, contexte, livrables attendus…"
+                    >{{- projet.description if projet else '' -}}</textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Statut</label>
+            <select name="statut" class="form-control">
+              {% for s, label in [('en_cours','En cours'), ('en_pause','En pause'), ('termine','Terminé')] %}
+                <option value="{{ s }}" {% if projet and projet.statut==s %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Priorité</label>
+            <select name="priorite" class="form-control">
+              {% for p, label in [('basse','Basse'), ('normale','Normale'), ('haute','Haute')] %}
+                <option value="{{ p }}" {% if projet and projet.priorite==p %}selected
+                        {% elif not projet and p=='normale' %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Date de début</label>
+            <input type="date" name="date_debut" class="form-control"
+                   value="{{ projet.date_debut.strftime('%Y-%m-%d')
+                            if projet and projet.date_debut else '' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Échéance (optionnel)</label>
+            <input type="date" name="echeance" class="form-control"
+                   value="{{ projet.echeance.strftime('%Y-%m-%d')
+                            if projet and projet.echeance else '' }}">
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="flex gap-2 justify-end">
+          <a href="{{ url_for('projets.index') }}"
+             class="btn btn-secondary">Annuler</a>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="{{ 'save' if projet else 'plus' }}"></i>
+            {{ "Enregistrer" if projet else "Créer" }}
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

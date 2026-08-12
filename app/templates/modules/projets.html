@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Projets{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Projets</h1>
+    <p>Planifie et suis l'avancement de tes projets</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('projets.journal') }}" class="btn btn-secondary">
+      <i data-lucide="clock"></i>
+      Journal d'activité
+    </a>
+    <a href="{{ url_for('projets.nouveau') }}" class="btn btn-primary">
+      <i data-lucide="plus"></i>
+      Nouveau projet
+    </a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Total</span>
+      <i data-lucide="layers" class="stat-icon" style="color:var(--text-muted)"></i>
+    </div>
+    <div class="stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">En cours</span>
+      <i data-lucide="loader" class="stat-icon text-warning"></i>
+    </div>
+    <div class="stat-value text-warning">{{ stats.en_cours }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">Terminés</span>
+      <i data-lucide="check-circle" class="stat-icon text-success"></i>
+    </div>
+    <div class="stat-value text-success">{{ stats.termine }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="flex items-center justify-between">
+      <span class="stat-label">En pause</span>
+      <i data-lucide="pause-circle" class="stat-icon" style="color:var(--text-secondary)"></i>
+    </div>
+    <div class="stat-value">{{ stats.en_pause }}</div>
+  </div>
+</div>
+
+<!-- Liste -->
+{% if projets %}
+  {% for projet in projets %}
+  <div class="cert-card
+    {% if projet.statut == 'termine' %}status-done
+    {% elif projet.statut == 'en_cours' %}status-wip
+    {% else %}status-todo{% endif %}">
+
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        {% if projet.statut == 'termine' %}
+          <span class="badge badge-success"><i data-lucide="check"></i> Terminé</span>
+        {% elif projet.statut == 'en_cours' %}
+          <span class="badge badge-warning"><i data-lucide="loader"></i> En cours</span>
+        {% else %}
+          <span class="badge badge-muted"><i data-lucide="pause"></i> En pause</span>
+        {% endif %}
+
+        {% if projet.priorite == 'haute' %}
+          <span class="badge badge-danger"><i data-lucide="flame"></i> Priorité haute</span>
+        {% elif projet.priorite == 'basse' %}
+          <span class="badge badge-muted">Priorité basse</span>
+        {% endif %}
+
+        {% if projet.echeance %}
+          {% set jours = projet.jours_restants() %}
+          {% if jours is not none %}
+            {% if jours < 0 %}
+              <span class="badge badge-danger">
+                <i data-lucide="alert-circle"></i> Dépassée {{ jours|abs }}j
+              </span>
+            {% elif jours <= 7 %}
+              <span class="badge badge-danger">
+                <i data-lucide="alarm-clock"></i> {{ jours }}j restants
+              </span>
+            {% elif jours <= 30 %}
+              <span class="badge badge-warning">
+                <i data-lucide="calendar"></i> {{ jours }}j restants
+              </span>
+            {% else %}
+              <span class="badge badge-muted">
+                <i data-lucide="calendar"></i> {{ projet.echeance.strftime('%d/%m/%Y') }}
+              </span>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <a href="{{ url_for('projets.voir', id=projet.id) }}" class="cert-name" style="text-decoration:none">
+        {{ projet.nom }}
+      </a>
+
+      {% if projet.description %}
+      <div class="cert-meta">
+        <span class="cert-meta-item">
+          <i data-lucide="file-text"></i>
+          {{ projet.description[:80] }}{% if projet.description|length > 80 %}…{% endif %}
+        </span>
+      </div>
+      {% endif %}
+
+      <div class="mb-1 flex items-center justify-between">
+        <span class="text-xs text-secondary">
+          {{ projet.taches|selectattr('statut','equalto','termine')|list|length }} / {{ projet.taches|length }} tâches
+        </span>
+        <span class="text-xs font-mono text-accent">{{ projet.progression() }}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill
+          {% if projet.progression() == 100 %}success
+          {% elif projet.progression() >= 60 %}warning{% endif %}"
+          style="width:{{ projet.progression() }}%">
+        </div>
+      </div>
+    </div>
+
+    <div class="cert-actions">
+      <a href="{{ url_for('projets.voir', id=projet.id) }}" class="btn btn-primary btn-sm">
+        <i data-lucide="kanban-square"></i>
+        Kanban
+      </a>
+      <a href="{{ url_for('projets.modifier', id=projet.id) }}" class="btn btn-secondary btn-sm">
+        <i data-lucide="pencil"></i>
+      </a>
+      <form action="{{ url_for('projets.supprimer', id=projet.id) }}"
+            method="POST"
+            onsubmit="return confirm('Supprimer ce projet et toutes ses tâches ?')">
+        <button class="btn btn-danger btn-sm">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </form>
+    </div>
+
+  </div>
+  {% endfor %}
+  {% include "_pagination.html" %}
+
+{% else %}
+  <div style="text-align:center;padding:64px 20px;">
+    <i data-lucide="kanban-square"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary" style="margin-bottom:16px">
+      Aucun projet créé
+    </p>
+    <a href="{{ url_for('projets.nouveau') }}" class="btn btn-primary">
+      <i data-lucide="plus"></i>
+      Créer mon premier projet
+    </a>
+  </div>
+{% endif %}
+
+{% endblock %}

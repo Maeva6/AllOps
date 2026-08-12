@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Projets / {{ projet.nom }}{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex items-center justify-between">
+  <div>
+    <div class="flex items-center gap-2 mb-1">
+      {% if projet.statut == 'termine' %}
+        <span class="badge badge-success"><i data-lucide="check"></i> Terminé</span>
+      {% elif projet.statut == 'en_cours' %}
+        <span class="badge badge-warning"><i data-lucide="loader"></i> En cours</span>
+      {% else %}
+        <span class="badge badge-muted"><i data-lucide="pause"></i> En pause</span>
+      {% endif %}
+      {% if projet.priorite == 'haute' %}
+        <span class="badge badge-danger"><i data-lucide="flame"></i> Priorité haute</span>
+      {% elif projet.priorite == 'basse' %}
+        <span class="badge badge-muted">Priorité basse</span>
+      {% endif %}
+      {% if projet.echeance %}
+        <span class="badge badge-muted">
+          <i data-lucide="calendar"></i> Échéance : {{ projet.echeance.strftime('%d/%m/%Y') }}
+        </span>
+      {% endif %}
+    </div>
+    <h1>{{ projet.nom }}</h1>
+    {% if projet.description %}<p>{{ projet.description }}</p>{% endif %}
+  </div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('projets.index') }}" class="btn btn-secondary">
+      <i data-lucide="arrow-left"></i> Retour
+    </a>
+    <a href="{{ url_for('projets.modifier', id=projet.id) }}" class="btn btn-secondary">
+      <i data-lucide="pencil"></i>
+    </a>
+    <form action="{{ url_for('projets.supprimer', id=projet.id) }}" method="POST"
+          onsubmit="return confirm('Supprimer ce projet et toutes ses tâches ?')">
+      <button class="btn btn-danger"><i data-lucide="trash-2"></i></button>
+    </form>
+  </div>
+</div>
+
+<!-- Ajouter une tâche -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form action="{{ url_for('projets.ajouter_tache', id=projet.id) }}" method="POST"
+          class="flex gap-2" style="align-items:flex-end">
+      <div class="form-group mb-0" style="flex:1">
+        <label class="form-label">Nouvelle tâche</label>
+        <input type="text" name="titre" class="form-control"
+               placeholder="Ex : Rédiger la synthèse du PROSIT" required>
+      </div>
+      <div class="form-group mb-0">
+        <label class="form-label">Échéance</label>
+        <input type="date" name="echeance" class="form-control">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i data-lucide="plus"></i> Ajouter
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Kanban -->
+<div class="kanban-board">
+  {% for statut, label, icon in [('a_faire','À faire','circle'),
+                                   ('en_cours','En cours','loader'),
+                                   ('termine','Terminé','check-circle')] %}
+  <div class="kanban-col">
+    <div class="kanban-col-header">
+      <span class="flex items-center gap-2">
+        <i data-lucide="{{ icon }}" style="width:14px;height:14px"></i>
+        {{ label }}
+      </span>
+      <span class="kanban-col-count">{{ colonnes[statut]|length }}</span>
+    </div>
+    <div class="kanban-col-body">
+      {% for tache in colonnes[statut] %}
+      <div class="kanban-card">
+        <div class="kanban-card-titre">{{ tache.titre }}</div>
+        {% if tache.echeance %}
+        <div class="text-xs text-muted mb-1 flex items-center gap-1">
+          <i data-lucide="calendar" style="width:11px;height:11px"></i>
+          {{ tache.echeance.strftime('%d/%m/%Y') }}
+        </div>
+        {% endif %}
+        <div class="kanban-card-footer">
+          <form action="{{ url_for('projets.changer_statut_tache', tid=tache.id) }}" method="POST">
+            <select name="statut" class="form-control"
+                    style="width:auto;font-size:11px;padding:4px 24px 4px 8px"
+                    onchange="this.form.submit()">
+              <option value="a_faire"  {% if tache.statut=='a_faire'  %}selected{% endif %}>À faire</option>
+              <option value="en_cours" {% if tache.statut=='en_cours' %}selected{% endif %}>En cours</option>
+              <option value="termine"  {% if tache.statut=='termine'  %}selected{% endif %}>Terminé</option>
+            </select>
+          </form>
+          <form action="{{ url_for('projets.supprimer_tache', tid=tache.id) }}" method="POST"
+                onsubmit="return confirm('Supprimer cette tâche ?')">
+            <button class="btn btn-danger btn-sm"><i data-lucide="trash-2"></i></button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-xs text-muted" style="padding:8px">Aucune tâche</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

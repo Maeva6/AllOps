@@ -2,21 +2,25 @@ import os
 import json
 import subprocess
 import tempfile
+import uuid
 from datetime import timezone
 from flask import (Blueprint, render_template, request,
                    flash, redirect, url_for, jsonify,
-                   send_file, Response)
+                   send_file, Response, stream_with_context)
 from app.extensions import db
 from app.models import SessionCER
 from app.services.cer_service import (
     generer_section_cer,
+    generer_section_cer_stream,
     generer_latex_complet,
     extraire_texte_fichier,
     extraire_prosit_aller,
     generer_word_cer,
 )
-from app.services.ai_errors import IAError
+from app.services.ai_errors import IAError, ai_guard
 import fitz
+
+CER_META_MARKER = '\x00__CER_META__'
 
 UTC = timezone.utc
 cer_bp = Blueprint('cer', __name__, url_prefix='/cer')
@@ -28,8 +32,13 @@ cer_bp = Blueprint('cer', __name__, url_prefix='/cer')
 
 @cer_bp.route('/')
 def index():
-    cers = SessionCER.query.order_by(SessionCER.created_at.desc()).all()
-    return render_template('cer/index.html', title="CER", cers=cers)
+    page = request.args.get('page', 1, type=int)
+    pagination = SessionCER.query.order_by(
+        SessionCER.created_at.desc()
+    ).paginate(page=page, per_page=12, error_out=False)
+    return render_template('cer/index.html', title="CER",
+                           cers=pagination.items, pagination=pagination,
+                           pagination_endpoint='cer.index')
 
 
 @cer_bp.route('/extraire-prosit', methods=['POST'])
@@ -119,8 +128,29 @@ def voir(id):
                            realisation_data=realisation_data)
 
 
+@cer_bp.route('/<int:id>/partager', methods=['POST'])
+def partager(id):
+    cer = db.session.get(SessionCER, id)
+    if not cer:
+        return jsonify({'erreur': 'CER introuvable'}), 404
+
+    if not cer.share_token:
+        cer.share_token = uuid.uuid4().hex
+        db.session.commit()
+
+    return jsonify({
+        'ok':  True,
+        'url': url_for('partage.cer_public', token=cer.share_token, _external=True),
+    })
+
+
 @cer_bp.route('/generer-section/<int:id>', methods=['POST'])
 def generer_section(id):
+    """Génère une section de CER en streamant le texte au fur et à mesure.
+
+    Même protocole que qa.poser() : le flux se termine par CER_META_MARKER
+    suivi d'un JSON {ok, ...} ou {ok:false, erreur}.
+    """
     cer  = db.session.get(SessionCER, id)
     if not cer:
         return jsonify({'erreur': 'CER introuvable'}), 404
@@ -129,42 +159,59 @@ def generer_section(id):
     section = data.get('section', '')
     plan    = cer.get_plan_action()
 
+    etape_index = None
+    etape_label = None
+    if section == 'realisation_etape':
+        etape_index = int(data.get('etape_index', 0))
+        etape_label = plan[etape_index] if etape_index < len(plan) else ''
+
+    guard = ai_guard(f'cer:{id}')
     try:
-        if section == 'realisation_etape':
-            etape_index = int(data.get('etape_index', 0))
-            etape_label = plan[etape_index] if etape_index < len(plan) else ''
-            contenu = generer_section_cer(
-                section='realisation_etape',
-                titre_prosit=cer.titre_prosit, contexte=cer.contexte,
-                besoins=cer.besoins, contraintes=cer.contraintes or '',
-                problematique=cer.problematique, plan_action=plan,
-                contenu_source=cer.contenu_source or '',
-                etape_index=etape_index + 1, etape_label=etape_label
-            )
-            real = {}
-            if cer.realisation:
-                try: real = json.loads(cer.realisation)
-                except Exception: pass
-            real[str(etape_index)] = contenu
-            cer.realisation = json.dumps(real)
-            db.session.commit()
-            return jsonify({'ok': True, 'contenu': contenu, 'etape_index': etape_index})
-        else:
-            contenu = generer_section_cer(
+        guard.__enter__()
+    except IAError as e:
+        return jsonify({'erreur': str(e)}), 503
+
+    def generate():
+        fragments = []
+        try:
+            stream = generer_section_cer_stream(
                 section=section,
                 titre_prosit=cer.titre_prosit, contexte=cer.contexte,
                 besoins=cer.besoins, contraintes=cer.contraintes or '',
                 problematique=cer.problematique, plan_action=plan,
                 contenu_source=cer.contenu_source or '',
+                etape_index=(etape_index + 1) if etape_index is not None else None,
+                etape_label=etape_label,
             )
-            setattr(cer, section, contenu)
-            db.session.commit()
-            return jsonify({'ok': True, 'contenu': contenu})
+            for delta in stream:
+                fragments.append(delta)
+                yield delta
 
-    except IAError as e:
-        return jsonify({'erreur': str(e)}), 503
-    except Exception as e:
-        return jsonify({'erreur': str(e)}), 500
+            contenu = ''.join(fragments)
+
+            if section == 'realisation_etape':
+                real = {}
+                if cer.realisation:
+                    try: real = json.loads(cer.realisation)
+                    except Exception: pass
+                real[str(etape_index)] = contenu
+                cer.realisation = json.dumps(real)
+                db.session.commit()
+                yield CER_META_MARKER + json.dumps({'ok': True, 'etape_index': etape_index})
+            else:
+                setattr(cer, section, contenu)
+                db.session.commit()
+                yield CER_META_MARKER + json.dumps({'ok': True})
+
+        except IAError as e:
+            yield CER_META_MARKER + json.dumps({'ok': False, 'erreur': str(e)})
+        except Exception as e:
+            yield CER_META_MARKER + json.dumps({'ok': False, 'erreur': str(e)})
+        finally:
+            guard.__exit__(None, None, None)
+
+    return Response(stream_with_context(generate()),
+                    mimetype='text/plain; charset=utf-8')
 
 
 @cer_bp.route('/generer-tout/<int:id>', methods=['POST'])
@@ -175,30 +222,31 @@ def generer_tout(id):
 
     plan = cer.get_plan_action()
     try:
-        real = {}
-        for i, etape in enumerate(plan):
-            real[str(i)] = generer_section_cer(
-                section='realisation_etape',
-                titre_prosit=cer.titre_prosit, contexte=cer.contexte,
-                besoins=cer.besoins, contraintes=cer.contraintes or '',
-                problematique=cer.problematique, plan_action=plan,
-                contenu_source=cer.contenu_source or '',
-                etape_index=i + 1, etape_label=etape
-            )
-        cer.realisation = json.dumps(real)
+        with ai_guard(f'cer:{id}', max_age=600.0):
+            real = {}
+            for i, etape in enumerate(plan):
+                real[str(i)] = generer_section_cer(
+                    section='realisation_etape',
+                    titre_prosit=cer.titre_prosit, contexte=cer.contexte,
+                    besoins=cer.besoins, contraintes=cer.contraintes or '',
+                    problematique=cer.problematique, plan_action=plan,
+                    contenu_source=cer.contenu_source or '',
+                    etape_index=i + 1, etape_label=etape
+                )
+            cer.realisation = json.dumps(real)
 
-        for section in ['validation', 'conclusion', 'bilan', 'synthese', 'references']:
-            setattr(cer, section, generer_section_cer(
-                section=section,
-                titre_prosit=cer.titre_prosit, contexte=cer.contexte,
-                besoins=cer.besoins, contraintes=cer.contraintes or '',
-                problematique=cer.problematique, plan_action=plan,
-                contenu_source=cer.contenu_source or ''
-            ))
+            for section in ['validation', 'conclusion', 'bilan', 'synthese', 'references']:
+                setattr(cer, section, generer_section_cer(
+                    section=section,
+                    titre_prosit=cer.titre_prosit, contexte=cer.contexte,
+                    besoins=cer.besoins, contraintes=cer.contraintes or '',
+                    problematique=cer.problematique, plan_action=plan,
+                    contenu_source=cer.contenu_source or ''
+                ))
 
-        cer.statut = 'genere'
-        db.session.commit()
-        return jsonify({'ok': True, 'message': 'CER généré avec succès'})
+            cer.statut = 'genere'
+            db.session.commit()
+            return jsonify({'ok': True, 'message': 'CER généré avec succès'})
 
     except IAError as e:
         return jsonify({'erreur': str(e)}), 503

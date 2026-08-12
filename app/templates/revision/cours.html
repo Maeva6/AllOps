@@ -17,10 +17,27 @@
       Généré le {{ session_obj.created_at.strftime('%d/%m/%Y à %H:%M') }}
     </div>
   </div>
+  <button class="btn btn-secondary" onclick="partagerCours()">
+    <i data-lucide="share-2"></i>
+  </button>
+  <a href="{{ url_for('revision.flashcards_reviser', id=session_obj.id) }}" class="btn btn-secondary">
+    <i data-lucide="layers"></i> Flashcards
+  </a>
   <button class="btn btn-primary" onclick="ouvrirQuiz()">
     <i data-lucide="pencil"></i>
     Faire le quiz
   </button>
+</div>
+
+<div id="shareBox" style="display:none" class="alert alert-info mb-4">
+  <i data-lucide="link"></i>
+  <div class="alert-content flex items-center gap-2">
+    <input type="text" id="shareUrl" class="form-control mono" readonly
+           style="flex:1" onclick="this.select()">
+    <button class="btn btn-secondary btn-sm" onclick="copierLienPartage()">
+      <i data-lucide="copy"></i> Copier
+    </button>
+  </div>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;
@@ -602,6 +619,31 @@ function relancerQuiz() {
   currentQ  = 0; score = 0; details = []; answered = false;
   startTime = Date.now();
   afficherQuestion();
+}
+
+async function partagerCours() {
+  const box = document.getElementById('shareBox');
+  const input = document.getElementById('shareUrl');
+  try {
+    const r = await fetch(`/revision/${SESSION_ID}/partager`, { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      input.value = data.url;
+      box.style.display = 'flex';
+      lucide.createIcons();
+      input.select();
+    } else {
+      alert('Erreur : ' + data.erreur);
+    }
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+  }
+}
+
+function copierLienPartage() {
+  const input = document.getElementById('shareUrl');
+  input.select();
+  navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
 }
 </script>
 {% endblock %}

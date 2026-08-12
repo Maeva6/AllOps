@@ -1,6 +1,7 @@
 from flask import Flask
 from app.config import Config
 from app.extensions import db, migrate
+from app.logging_config import configure_logging
 from app.routes.main import main_bp
 from app.routes.files import files_bp
 from app.routes.tracker import tracker_bp  
@@ -12,11 +13,16 @@ from app.routes.correction import correction_bp
 from app.models import SessionCorrection
 from app.routes.qa import qa_bp
 from app.models import SessionQA
+from app.routes.recherche import recherche_bp
+from app.routes.partage import partage_bp
+from app.routes.projets import projets_bp
+from app.models import Projet, Tache, ActiviteJournaliere
 from datetime import datetime, timezone
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -31,6 +37,9 @@ def create_app(config_class=Config):
     app.register_blueprint(cer_bp)
     app.register_blueprint(correction_bp)
     app.register_blueprint(qa_bp)
+    app.register_blueprint(recherche_bp)
+    app.register_blueprint(partage_bp)
+    app.register_blueprint(projets_bp)
 
 
     @app.context_processor

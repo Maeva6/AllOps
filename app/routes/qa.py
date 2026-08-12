@@ -2,10 +2,12 @@
 import json
 from datetime import datetime, timezone
 from flask import (Blueprint, render_template, request,
-                   jsonify, Response)
+                   jsonify, Response, stream_with_context)
 from app.extensions import db
 from app.models import SessionQA
-from app.services.ai_errors import safe_chat_completion, IAError
+from app.services.ai_errors import stream_chat_completion, IAError, ai_guard
+
+META_MARKER = '\x00__QA_META__'
 
 UTC = timezone.utc
 qa_bp = Blueprint('qa', __name__, url_prefix='/qa')
@@ -49,7 +51,14 @@ def index():
 
 @qa_bp.route('/poser', methods=['POST'])
 def poser():
-    """Répondre à une question via Groq (streaming ou normal)."""
+    """Répond à une question via Groq, en streamant la réponse token par
+    token (texte brut) plutôt que d'attendre la réponse complète.
+
+    Le flux se termine par un marqueur invisible (META_MARKER) suivi d'un
+    JSON `{ok, id}` ou `{ok:false, erreur}` — le client sait ainsi si la
+    génération a réussi une fois le flux terminé, sans code de statut HTTP
+    puisque les entêtes sont déjà envoyés à ce stade.
+    """
     data     = request.json or {}
     question = data.get('question', '').strip()
     mode     = data.get('mode', 'direct')
@@ -75,38 +84,47 @@ def poser():
 
 Mode de réponse : {instruction}"""
 
+    # La garde anti-spam est acquise avant d'ouvrir le flux, pour pouvoir
+    # renvoyer une vraie erreur HTTP 503 si une génération est déjà en cours
+    # (une fois le streaming démarré, le code de statut ne peut plus changer).
+    guard = ai_guard(f'qa-poser:{request.remote_addr}', max_age=60.0)
     try:
-        response = safe_chat_completion(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt}
-            ],
-            temperature=0.4,
-            max_tokens=800,
-        )
-        reponse = response.choices[0].message.content.strip()
-
-        # Sauvegarder dans l'historique
-        session_qa = SessionQA(
-            question=question,
-            reponse=reponse,
-            mode=mode,
-            matiere=matiere,
-        )
-        db.session.add(session_qa)
-        db.session.commit()
-
-        return jsonify({
-            'ok':      True,
-            'reponse': reponse,
-            'id':      session_qa.id,
-        })
-
+        guard.__enter__()
     except IAError as e:
         return jsonify({'erreur': str(e)}), 503
-    except Exception as e:
-        return jsonify({'erreur': str(e)}), 500
+
+    def generate():
+        fragments = []
+        try:
+            for delta in stream_chat_completion(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_prompt}
+                ],
+                temperature=0.4,
+                max_tokens=800,
+            ):
+                fragments.append(delta)
+                yield delta
+
+            reponse = ''.join(fragments).strip()
+            session_qa = SessionQA(
+                question=question, reponse=reponse, mode=mode, matiere=matiere,
+            )
+            db.session.add(session_qa)
+            db.session.commit()
+            yield META_MARKER + json.dumps({'ok': True, 'id': session_qa.id})
+
+        except IAError as e:
+            yield META_MARKER + json.dumps({'ok': False, 'erreur': str(e)})
+        except Exception as e:
+            yield META_MARKER + json.dumps({'ok': False, 'erreur': str(e)})
+        finally:
+            guard.__exit__(None, None, None)
+
+    return Response(stream_with_context(generate()),
+                    mimetype='text/plain; charset=utf-8')
 
 
 @qa_bp.route('/question/<int:id>')

@@ -41,6 +41,10 @@
         <i data-lucide="award" class="nav-icon"></i>
         Certifications
       </a>
+      <a href="/projets/" class="nav-link {% if request.blueprint == 'projets' %}active{% endif %}">
+        <i data-lucide="kanban-square" class="nav-icon"></i>
+        Projets
+      </a>
       <a href="/detente/" class="nav-link
    {% if request.blueprint == 'detente' %}active{% endif %}">
   <i data-lucide="gamepad-2" class="nav-icon"></i>
@@ -97,6 +101,13 @@
     <span class="sep">/</span>
     <span class="current">{% block breadcrumb %}Accueil{% endblock %}</span>
   </div>
+
+  <!-- Recherche globale -->
+  <form method="GET" action="{{ url_for('recherche.index') }}"
+        style="display:flex;align-items:center">
+    <input type="text" name="q" placeholder="Rechercher…" class="form-control"
+           style="width:200px;padding:7px 12px;font-size:12.5px">
+  </form>
 
   <!-- Toggle thème -->
   <button class="theme-toggle" id="themeToggle" title="Changer le thème">

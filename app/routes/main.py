@@ -51,6 +51,7 @@
 #                            certs_urgentes=certs_urgentes,
 #                            dernieres_ops=dernieres_ops)
 
+from datetime import date, timedelta
 from flask import Blueprint, render_template
 from app.extensions import db
 from app.models import Certification, FileOperation
@@ -75,8 +76,18 @@ def index():
         statut='En cours'
     ).limit(4).all()
 
+    # Certifications dont la deadline approche (30 jours), pas encore validées
+    dans_30_jours = date.today() + timedelta(days=30)
+    certs_urgentes = Certification.query.filter(
+        Certification.deadline.isnot(None),
+        Certification.deadline <= dans_30_jours,
+        Certification.deadline >= date.today(),
+        Certification.statut != 'Validée'
+    ).order_by(Certification.deadline).limit(5).all()
+
     return render_template('index.html',
                            title="Tableau de bord",
                            stats=stats,
                            recent_ops=recent_ops,
-                           recent_certs=recent_certs)
+                           recent_certs=recent_certs,
+                           certs_urgentes=certs_urgentes)

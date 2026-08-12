@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Partagé · {{ cer.titre_prosit[:40] }}{% endblock %}
+
+{% block content %}
+
+<div class="alert alert-info mb-4">
+  <i data-lucide="eye"></i>
+  <div class="alert-content">
+    Lien de partage en lecture seule — les actions d'édition ne sont pas disponibles ici.
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>{{ cer.titre_prosit }}</h1>
+  <p>
+    {{ cer.etudiant }}
+    {% if cer.promotion %} · {{ cer.promotion }}{% endif %}
+    · {{ cer.created_at.strftime('%d/%m/%Y') }}
+  </p>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i data-lucide="list" class="header-icon"></i> I. Analyse du contexte</div>
+  <div class="card-body">{{ sections_html.contexte | safe }}</div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i data-lucide="list" class="header-icon"></i> II. Besoins &amp; contraintes</div>
+  <div class="card-body">
+    <strong>Besoins</strong>
+    <ul>{% for b in (cer.besoins or '').splitlines() if b.strip() %}<li>{{ b.strip('-•* \t') }}</li>{% endfor %}</ul>
+    {% if cer.contraintes %}
+    <strong>Contraintes</strong>
+    <ul>{% for c in cer.contraintes.splitlines() if c.strip() %}<li>{{ c.strip('-•* \t') }}</li>{% endfor %}</ul>
+    {% endif %}
+    <strong>Problématique</strong>
+    <p>{{ cer.problematique }}</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i data-lucide="map" class="header-icon"></i> Plan d'action</div>
+  <div class="card-body">
+    <ol>{% for etape in plan %}<li>{{ etape }}</li>{% endfor %}</ol>
+  </div>
+</div>
+
+{% if realisation_html %}
+  {% for etape in plan %}
+    {% if loop.index0|string in realisation_html %}
+    <div class="card mb-3">
+      <div class="card-header"><i data-lucide="check-circle" class="header-icon"></i> {{ etape }}</div>
+      <div class="card-body">{{ realisation_html[loop.index0|string] | safe }}</div>
+    </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% for key, label in [('validation','Validation des pistes de solutions'),
+                       ('conclusion','Conclusion'),
+                       ('bilan','Bilan critique'),
+                       ('synthese','Synthèse')] %}
+  {% if sections_html[key] %}
+  <div class="card mb-3">
+    <div class="card-header"><i data-lucide="file-text" class="header-icon"></i> {{ label }}</div>
+    <div class="card-body">{{ sections_html[key] | safe }}</div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+{% if sections_html.references %}
+<div class="card mb-3">
+  <div class="card-header"><i data-lucide="book-open" class="header-icon"></i> Références</div>
+  <div class="card-body">{{ sections_html.references | safe }}</div>
+</div>
+{% endif %}
+
+{% endblock %}

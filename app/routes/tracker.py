@@ -12,11 +12,12 @@ tracker_bp = Blueprint('tracker', __name__, url_prefix='/certifications')
 # ─── Dashboard principal ──────────────────────────────────────────────────────
 @tracker_bp.route('/')
 def index():
-    certifications = Certification.query.order_by(
+    page = request.args.get('page', 1, type=int)
+    pagination = Certification.query.order_by(
         Certification.statut, Certification.deadline
-    ).all()
+    ).paginate(page=page, per_page=20, error_out=False)
 
-    # Statistiques pour les cartes du haut
+    # Statistiques pour les cartes du haut (toujours sur l'ensemble, pas la page)
     stats = {
         'total':    Certification.query.count(),
         'validees': Certification.query.filter_by(statut='Validée').count(),
@@ -27,7 +28,9 @@ def index():
 
     return render_template('modules/tracker.html',
                            title="Suivi des Certifications",
-                           certifications=certifications,
+                           certifications=pagination.items,
+                           pagination=pagination,
+                           pagination_endpoint='tracker.index',
                            stats=stats)
 
 

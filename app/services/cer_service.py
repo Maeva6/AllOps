@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 import fitz
-from app.services.ai_errors import safe_chat_completion
+from app.services.ai_errors import safe_chat_completion, stream_chat_completion
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -551,7 +551,7 @@ def nettoyer_code_listing(code: str) -> str:
 # GÉNÉRATION DES SECTIONS VIA GROQ
 # ══════════════════════════════════════════════════════════════════════
 
-def generer_section_cer(
+def _construire_prompt_section(
     section: str,
     titre_prosit: str,
     contexte: str,
@@ -562,7 +562,12 @@ def generer_section_cer(
     contenu_source: str = "",
     etape_index: int = None,
     etape_label: str = None
-) -> str:
+):
+    """Construit le prompt pour une section de CER, ou None si inconnue.
+
+    Factorisé pour être partagé entre generer_section_cer (bloquant) et
+    generer_section_cer_stream (streaming) : un seul prompt à maintenir.
+    """
     plan_str = "\n".join([f"{i+1}. {p}" for i, p in enumerate(plan_action)])
     source_ctx = (
         f"\nDocuments de référence (corbeille / workshop) :\n---\n{contenu_source[:4000]}\n---\n"
@@ -647,6 +652,28 @@ NE génère QUE la bibliographie, pas d'autre texte.
 """
 
     else:
+        return None
+
+    return prompt
+
+
+def generer_section_cer(
+    section: str,
+    titre_prosit: str,
+    contexte: str,
+    besoins: str,
+    contraintes: str,
+    problematique: str,
+    plan_action: list,
+    contenu_source: str = "",
+    etape_index: int = None,
+    etape_label: str = None
+) -> str:
+    prompt = _construire_prompt_section(
+        section, titre_prosit, contexte, besoins, contraintes, problematique,
+        plan_action, contenu_source, etape_index, etape_label
+    )
+    if prompt is None:
         return ""
 
     response = safe_chat_completion(
@@ -656,6 +683,34 @@ NE génère QUE la bibliographie, pas d'autre texte.
         max_tokens=3000,
     )
     return response.choices[0].message.content
+
+
+def generer_section_cer_stream(
+    section: str,
+    titre_prosit: str,
+    contexte: str,
+    besoins: str,
+    contraintes: str,
+    problematique: str,
+    plan_action: list,
+    contenu_source: str = "",
+    etape_index: int = None,
+    etape_label: str = None
+):
+    """Variante streaming de generer_section_cer : yield des fragments de texte."""
+    prompt = _construire_prompt_section(
+        section, titre_prosit, contexte, besoins, contraintes, problematique,
+        plan_action, contenu_source, etape_index, etape_label
+    )
+    if prompt is None:
+        return
+
+    yield from stream_chat_completion(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=3000,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════

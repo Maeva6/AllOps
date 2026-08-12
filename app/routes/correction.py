@@ -16,7 +16,7 @@ from app.services.correction_service import (
     generer_word_correction,
     TYPES_DOC,
 )
-from app.services.ai_errors import IAError
+from app.services.ai_errors import IAError, ai_guard
 import fitz
 
 UTC = timezone.utc
@@ -27,12 +27,15 @@ correction_bp = Blueprint('correction', __name__,
 # ─── Accueil ──────────────────────────────────────────────────────────────────
 @correction_bp.route('/')
 def index():
-    sessions = SessionCorrection.query.order_by(
+    page = request.args.get('page', 1, type=int)
+    pagination = SessionCorrection.query.order_by(
         SessionCorrection.created_at.desc()
-    ).limit(20).all()
+    ).paginate(page=page, per_page=15, error_out=False)
     return render_template('correction/index.html',
                            title="Correction de devoirs",
-                           sessions=sessions,
+                           sessions=pagination.items,
+                           pagination=pagination,
+                           pagination_endpoint='correction.index',
                            types_doc=TYPES_DOC)
 
 
@@ -88,26 +91,27 @@ def corriger(id):
         return redirect(url_for('correction.index'))
 
     try:
-        corrections = generer_correction(
-            session_obj.contenu_source,
-            session_obj.titre,
-            session_obj.type_doc
-        )
+        with ai_guard(f'correction:{id}'):
+            corrections = generer_correction(
+                session_obj.contenu_source,
+                session_obj.titre,
+                session_obj.type_doc
+            )
 
-        if not corrections:
-            flash('L\'IA n\'a pas pu générer de correction. Réessaie.', 'warning')
-            session_obj.statut = 'erreur'
+            if not corrections:
+                flash('L\'IA n\'a pas pu générer de correction. Réessaie.', 'warning')
+                session_obj.statut = 'erreur'
+                db.session.commit()
+                return redirect(url_for('correction.index'))
+
+            resume = generer_resume_notions(corrections, session_obj.titre)
+
+            session_obj.correction = json.dumps({
+                'items':  corrections,
+                'resume': resume,
+            }, ensure_ascii=False)
+            session_obj.statut = 'corrige'
             db.session.commit()
-            return redirect(url_for('correction.index'))
-
-        resume = generer_resume_notions(corrections, session_obj.titre)
-
-        session_obj.correction = json.dumps({
-            'items':  corrections,
-            'resume': resume,
-        }, ensure_ascii=False)
-        session_obj.statut = 'corrige'
-        db.session.commit()
 
     except IAError as e:
         flash(str(e), 'danger')

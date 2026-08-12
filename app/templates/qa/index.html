@@ -544,15 +544,14 @@ async function envoyerQuestion() {
       body:    JSON.stringify({ question, mode, matiere })
     });
 
-    const data = await r.json();
-
-    if (data.ok) {
-      replaceTypingWithResponse(data.reponse, mode, data.id);
-    } else {
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
       replaceTypingWithResponse(
         `❌ Erreur : ${data.erreur || 'Réessaie dans quelques secondes.'}`,
         mode, 0
       );
+    } else {
+      await streamerReponse(r, mode);
     }
   } catch(e) {
     replaceTypingWithResponse(
@@ -564,6 +563,63 @@ async function envoyerQuestion() {
   isLoading = false;
   btn.disabled = false;
   btn.style.opacity = '1';
+}
+
+// ── Lire le flux de réponse et l'afficher progressivement ─────────────────────
+const QA_META_MARKER = '\x00__QA_META__';
+
+async function streamerReponse(r, mode) {
+  const typing = document.getElementById('typingIndicator');
+  if (typing) typing.remove();
+
+  const div = document.createElement('div');
+  div.className = 'msg-reponse';
+  div.innerHTML = `
+    <div class="msg-reponse-avatar">
+      <i data-lucide="bot" style="width:14px;height:14px;color:white"></i>
+    </div>
+    <div class="msg-reponse-content">
+      <div class="msg-reponse-bubble" id="streamBubble"></div>
+    </div>
+  `;
+  document.getElementById('messages').appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  scrollBottom();
+
+  const bubble  = document.getElementById('streamBubble');
+  const reader  = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer    = '';
+  let meta      = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const idx = buffer.indexOf(QA_META_MARKER);
+    if (idx !== -1) {
+      const texte = buffer.slice(0, idx);
+      bubble.textContent = texte;
+      try {
+        meta = JSON.parse(buffer.slice(idx + QA_META_MARKER.length));
+      } catch (e) { /* marqueur tronqué : on considère le flux comme réussi */ }
+      buffer = texte;
+      break;
+    }
+    bubble.textContent = buffer;
+    scrollBottom();
+  }
+
+  div.remove();
+
+  if (meta && meta.ok) {
+    replaceTypingWithResponse(buffer, mode, meta.id);
+  } else {
+    const errMsg = (meta && meta.erreur) || 'Réessaie dans quelques secondes.';
+    replaceTypingWithResponse(`❌ Erreur : ${errMsg}`, mode, 0);
+  }
 }
 
 // ── Charger une question de l'historique ──────────────────────────────────────

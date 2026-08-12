@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Recherche{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Recherche</h1>
+  <p>
+    {% if q %}
+      Résultats pour « {{ q }} »
+    {% else %}
+      Cherche dans les certifications, CER, révisions, corrections et questions de cours
+    {% endif %}
+  </p>
+</div>
+
+<form method="GET" action="{{ url_for('recherche.index') }}" class="mb-4">
+  <div class="input-group" style="max-width:480px">
+    <input type="text" name="q" value="{{ q }}" class="form-control"
+           placeholder="Rechercher…" autofocus>
+    <button type="submit" class="btn btn-primary">
+      <i data-lucide="search"></i>
+    </button>
+  </div>
+</form>
+
+{% if q and q|length < 2 %}
+  <p class="text-muted">Tape au moins 2 caractères.</p>
+{% elif q and not resultats %}
+  <div style="text-align:center;padding:64px 20px">
+    <i data-lucide="search-x"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">Aucun résultat pour « {{ q }} »</p>
+  </div>
+{% elif resultats %}
+  <div class="table-wrapper">
+    {% for r in resultats %}
+    <a href="{{ r.url }}" class="explorer-item" style="height:auto;padding:14px">
+      <i data-lucide="{{ r.icon }}"></i>
+      <div class="explorer-item-name">
+        <div style="font-weight:500;color:var(--text-primary)">{{ r.titre }}</div>
+        <div class="text-xs text-muted">{{ r.type }}{% if r.sous_titre %} · {{ r.sous_titre }}{% endif %}</div>
+      </div>
+      {% if r.date %}
+      <span class="text-xs text-muted">{{ r.date.strftime('%d/%m/%Y') }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% endblock %}

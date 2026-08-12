@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Partagé · {{ session_obj.titre }}{% endblock %}
+
+{% block content %}
+
+<div class="alert alert-info mb-4">
+  <i data-lucide="eye"></i>
+  <div class="alert-content">
+    Lien de partage en lecture seule — les actions d'édition ne sont pas disponibles ici.
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>{{ session_obj.titre }}</h1>
+  <p>{{ session_obj.domaine|capitalize }} · {{ session_obj.created_at.strftime('%d/%m/%Y') }}</p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <i data-lucide="book-open" class="header-icon"></i> Cours
+  </div>
+  <div class="card-body">
+    {{ cours_html | safe }}
+  </div>
+</div>
+
+{% endblock %}

@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 
 from app.extensions import db
 from app.models import SessionCER, SessionRevision, SessionCorrection, SessionQA
-from app.services.ai_errors import IAError
+from app.services.ai_errors import IAError, ai_guard
 
 
 def fake_completion(content: str):
@@ -19,6 +19,16 @@ def fake_completion(content: str):
     response.choices = [MagicMock()]
     response.choices[0].message.content = content
     return response
+
+
+def fake_stream(content: str, chunk_size: int = 5):
+    """Simule stream_chat_completion / generer_*_stream : découpe `content`
+    en fragments successifs. Accepte args positionnels et nommés, les deux
+    styles d'appel étant utilisés selon la fonction streamée."""
+    def _gen(*args, **kwargs):
+        for i in range(0, len(content), chunk_size):
+            yield content[i:i + chunk_size]
+    return _gen
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -64,27 +74,43 @@ class TestCER:
         assert response.status_code == 200
         assert b'introuvable' in response.data.lower() or b'CER' in response.data
 
-    @patch('app.services.cer_service.safe_chat_completion')
-    def test_generer_section_success(self, mock_completion, client, sample_cer):
-        mock_completion.return_value = fake_completion('## Validation générée')
+    @patch('app.services.cer_service.stream_chat_completion')
+    def test_generer_section_success(self, mock_stream, client, sample_cer):
+        mock_stream.side_effect = fake_stream('## Validation générée')
         response = client.post(
             f'/cer/generer-section/{sample_cer}',
             json={'section': 'validation'}
         )
         assert response.status_code == 200
-        data = response.get_json()
-        assert data['ok'] is True
-        assert 'Validation générée' in data['contenu']
+        raw = response.get_data(as_text=True)
+        assert 'Validation générée' in raw
+        assert '"ok": true' in raw
 
-    @patch('app.services.cer_service.safe_chat_completion')
-    def test_generer_section_erreur_ia(self, mock_completion, client, sample_cer):
-        mock_completion.side_effect = IAError("Clé API Groq manquante.")
+    def test_generer_section_erreur_ia_avant_stream(self, client, sample_cer):
+        with patch('app.routes.cer.ai_guard') as mock_guard:
+            mock_guard.return_value.__enter__.side_effect = IAError("Clé API Groq manquante.")
+            response = client.post(
+                f'/cer/generer-section/{sample_cer}',
+                json={'section': 'validation'}
+            )
+        assert response.status_code == 503
+        assert 'Clé API' in response.get_json()['erreur']
+
+    @patch('app.services.cer_service.stream_chat_completion')
+    def test_generer_section_erreur_ia_en_cours_de_stream(self, mock_stream, client, sample_cer):
+        def _gen(**kwargs):
+            yield 'Début... '
+            raise IAError("Quota Groq atteint.")
+        mock_stream.side_effect = _gen
+
         response = client.post(
             f'/cer/generer-section/{sample_cer}',
             json={'section': 'validation'}
         )
-        assert response.status_code == 503
-        assert 'Clé API' in response.get_json()['erreur']
+        assert response.status_code == 200  # entêtes déjà envoyés
+        raw = response.get_data(as_text=True)
+        assert '"ok": false' in raw
+        assert 'Quota Groq' in raw
 
     def test_generer_section_session_introuvable(self, client):
         response = client.post('/cer/generer-section/9999', json={'section': 'validation'})
@@ -119,31 +145,54 @@ class TestRevisionIA:
         assert response.status_code == 200
 
     def test_generer_sans_titre(self, client):
-        response = client.post('/revision/generer', data={}, follow_redirects=True)
-        assert response.status_code == 200
+        response = client.post('/revision/generer', data={})
+        assert response.status_code == 400
         assert SessionRevision.query.count() == 0
 
-    @patch('app.services.groq_service.safe_chat_completion')
-    def test_generer_success(self, mock_completion, client):
-        mock_completion.return_value = fake_completion('## Cours généré\nContenu.')
+    @patch('app.routes.revision.generer_cours_stream')
+    def test_generer_success(self, mock_stream, client):
+        mock_stream.side_effect = fake_stream('## Cours généré\nContenu.')
         response = client.post('/revision/generer', data={
             'titre': 'Les arbres binaires',
             'domaine': 'informatique',
-        }, follow_redirects=False)
-        assert response.status_code == 302
+        })
+        assert response.status_code == 200
+        raw = response.get_data(as_text=True)
+        assert 'Cours généré' in raw
+        assert '"ok": true' in raw
+
         session_obj = SessionRevision.query.filter_by(titre='Les arbres binaires').first()
         assert session_obj is not None
         assert 'Cours généré' in session_obj.cours_genere
 
-    @patch('app.services.groq_service.safe_chat_completion')
-    def test_generer_erreur_ia(self, mock_completion, client):
-        mock_completion.side_effect = IAError("Le service IA n'est pas configuré.")
+    def test_generer_erreur_ia_avant_stream(self, client):
+        with patch('app.routes.revision.ai_guard') as mock_guard:
+            mock_guard.return_value.__enter__.side_effect = IAError(
+                "Le service IA n'est pas configuré."
+            )
+            response = client.post('/revision/generer', data={
+                'titre': 'Les arbres binaires',
+                'domaine': 'informatique',
+            })
+        assert response.status_code == 503
+        assert 'pas configuré' in response.get_json()['erreur']
+
+    @patch('app.routes.revision.generer_cours_stream')
+    def test_generer_erreur_ia_en_cours_de_stream(self, mock_stream, client):
+        def _gen(*a, **kw):
+            yield 'Début... '
+            raise IAError("Quota Groq atteint.")
+        mock_stream.side_effect = _gen
+
         response = client.post('/revision/generer', data={
             'titre': 'Les arbres binaires',
             'domaine': 'informatique',
-        }, follow_redirects=True)
-        assert response.status_code == 200
-        assert 'pas configuré' in response.get_data(as_text=True)
+        })
+        assert response.status_code == 200  # entêtes déjà envoyés
+        raw = response.get_data(as_text=True)
+        assert '"ok": false' in raw
+        assert 'Quota Groq' in raw
+        assert SessionRevision.query.count() == 0
 
     @patch('app.services.gemini_service.safe_chat_completion')
     def test_generer_quiz_success(self, mock_completion, client, sample_session):
@@ -249,26 +298,47 @@ class TestQA:
         response = client.post('/qa/poser', json={'question': ''})
         assert response.status_code == 400
 
-    @patch('app.routes.qa.safe_chat_completion')
-    def test_poser_success(self, mock_completion, client):
-        mock_completion.return_value = fake_completion('La complexité de O(n) est linéaire.')
+    @patch('app.routes.qa.stream_chat_completion')
+    def test_poser_success(self, mock_stream, client):
+        mock_stream.side_effect = fake_stream('La complexité de O(n) est linéaire.')
         response = client.post('/qa/poser', json={
             'question': "Qu'est-ce que la complexité O(n) ?",
             'mode': 'direct',
         })
         assert response.status_code == 200
-        data = response.get_json()
-        assert data['ok'] is True
+        raw = response.get_data(as_text=True)
+        assert 'La complexité de O(n) est linéaire.' in raw
+        assert '"ok": true' in raw
         assert SessionQA.query.count() == 1
 
-    @patch('app.routes.qa.safe_chat_completion')
-    def test_poser_erreur_ia(self, mock_completion, client):
-        mock_completion.side_effect = IAError("La clé GROQ_API_KEY est invalide.")
+    @patch('app.routes.qa.stream_chat_completion')
+    def test_poser_erreur_ia_avant_stream(self, mock_stream, client):
+        mock_stream.side_effect = lambda **kw: iter(())  # ne devrait pas être appelé
+        with patch('app.routes.qa.ai_guard') as mock_guard:
+            mock_guard.return_value.__enter__.side_effect = IAError(
+                "La clé GROQ_API_KEY est invalide."
+            )
+            response = client.post('/qa/poser', json={
+                'question': "Qu'est-ce que la complexité O(n) ?",
+            })
+        assert response.status_code == 503
+        assert 'invalide' in response.get_json()['erreur']
+
+    @patch('app.routes.qa.stream_chat_completion')
+    def test_poser_erreur_ia_en_cours_de_stream(self, mock_stream, client):
+        def _gen(**kwargs):
+            yield 'Début de réponse... '
+            raise IAError("Quota Groq atteint.")
+        mock_stream.side_effect = _gen
+
         response = client.post('/qa/poser', json={
             'question': "Qu'est-ce que la complexité O(n) ?",
         })
-        assert response.status_code == 503
-        assert 'invalide' in response.get_json()['erreur']
+        assert response.status_code == 200  # entêtes déjà envoyés
+        raw = response.get_data(as_text=True)
+        assert '"ok": false' in raw
+        assert 'Quota Groq' in raw
+        assert SessionQA.query.count() == 0  # rien sauvegardé si ça échoue
 
     def test_supprimer_et_vider(self, client, app):
         with app.app_context():
@@ -283,3 +353,38 @@ class TestQA:
 
         response = client.post('/qa/vider')
         assert response.status_code == 200
+
+
+# ══════════════════════════════════════════════════════════════════════
+# GARDE ANTI-SPAM (ai_guard)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestAIGuard:
+
+    def test_sequential_calls_ok(self):
+        with ai_guard('test-key-1'):
+            pass
+        with ai_guard('test-key-1'):
+            pass  # la clé a été libérée après le premier `with`, pas de conflit
+
+    def test_concurrent_call_blocked(self):
+        with ai_guard('test-key-2'):
+            with pytest.raises(IAError):
+                with ai_guard('test-key-2'):
+                    pass
+
+    def test_guard_released_after_exception(self):
+        with pytest.raises(ValueError):
+            with ai_guard('test-key-3'):
+                raise ValueError('boom')
+        # la clé doit être libérée même si le bloc a levé une exception
+        with ai_guard('test-key-3'):
+            pass
+
+    def test_stale_guard_expires(self):
+        with ai_guard('test-key-4', max_age=0.01):
+            import time
+            time.sleep(0.02)
+            # une seconde tentative après expiration ne doit pas bloquer
+            with ai_guard('test-key-4', max_age=0.01):
+                pass

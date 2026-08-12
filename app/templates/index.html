@@ -8,6 +8,26 @@
   <p>Bienvenue sur AllOps — automatisation et suivi des certifications</p>
 </div>
 
+{% if certs_urgentes %}
+<div class="alert {{ 'alert-danger' if certs_urgentes[0].jours_restants() <= 7 else 'alert-warning' }}">
+  <i data-lucide="alarm-clock"></i>
+  <div class="alert-content">
+    <strong>{{ certs_urgentes|length }} certification{{ 's' if certs_urgentes|length > 1 else '' }}
+    à échéance proche :</strong>
+    <div class="flex flex-col gap-1" style="margin-top:6px">
+      {% for cert in certs_urgentes %}
+      <a href="{{ url_for('tracker.modifier', id=cert.id) }}"
+         style="color:inherit;text-decoration:underline">
+        {{ cert.nom }}
+        — {{ cert.jours_restants() }} jour{{ 's' if cert.jours_restants() > 1 else '' }}
+        (échéance le {{ cert.deadline.strftime('%d/%m/%Y') }})
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Stats -->
 <div class="stat-grid">
   <div class="stat-card">

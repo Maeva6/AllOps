@@ -18,6 +18,9 @@
     </div>
   </div>
   <div class="flex gap-2">
+    <button class="btn btn-secondary btn-sm" onclick="partagerCer()">
+      <i data-lucide="share-2"></i> Partager
+    </button>
     <a href="{{ url_for('cer.export_latex', id=cer.id) }}"
        class="btn btn-secondary btn-sm">
       <i data-lucide="code"></i> .tex
@@ -30,6 +33,17 @@
        class="btn btn-secondary btn-sm">
       <i data-lucide="file"></i> Word
     </a>
+  </div>
+</div>
+
+<div id="shareBox" style="display:none" class="alert alert-info mb-4">
+  <i data-lucide="link"></i>
+  <div class="alert-content flex items-center gap-2">
+    <input type="text" id="shareUrl" class="form-control mono" readonly
+           style="flex:1" onclick="this.select()">
+    <button class="btn btn-secondary btn-sm" onclick="copierLienPartage()">
+      <i data-lucide="copy"></i> Copier
+    </button>
   </div>
 </div>
 
@@ -336,27 +350,56 @@ function toggleEtape(i) {
   chevron.style.transform = visible ? '' : 'rotate(180deg)';
 }
 
-async function genererEtape(i) {
-  const btn     = document.getElementById('btnEtape' + i);
-  const loading = document.getElementById('loading-etape-' + i);
-  const contenu = document.getElementById('contenu-etape-' + i);
-  const icon    = document.getElementById('icon-etape-' + i);
+const CER_META_MARKER = '\x00__CER_META__';
 
-  btn.disabled          = true;
-  loading.style.display = 'block';
-  contenu.style.display = 'block';
+async function streamerSection(body, { btn, loading, contenu, icon }) {
+  btn.disabled           = true;
+  loading.style.display  = 'block';
+  contenu.style.display  = 'block';
+  contenu.innerHTML      = '';
+
+  let buffer = '';
+  let meta   = null;
 
   try {
     const r = await fetch('/cer/generer-section/' + CER_ID, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ section: 'realisation_etape', etape_index: i })
+      body:    JSON.stringify(body)
     });
-    const data = await r.json();
+
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      loading.style.display = 'none';
+      contenu.innerHTML =
+        '<span style="color:var(--danger)">Erreur : ' + (data.erreur || 'Réessaie.') + '</span>';
+      btn.disabled = false;
+      return;
+    }
+
     loading.style.display = 'none';
 
-    if (data.ok) {
-      contenu.innerHTML = data.contenu.replace(/\n/g, '<br>');
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const idx = buffer.indexOf(CER_META_MARKER);
+      if (idx !== -1) {
+        const texte = buffer.slice(0, idx);
+        contenu.innerHTML = texte.replace(/\n/g, '<br>');
+        try { meta = JSON.parse(buffer.slice(idx + CER_META_MARKER.length)); }
+        catch (e) { /* marqueur tronqué : on considère le flux comme réussi */ }
+        buffer = texte;
+        break;
+      }
+      contenu.innerHTML = buffer.replace(/\n/g, '<br>');
+    }
+
+    if (meta && meta.ok) {
       btn.innerHTML = '<i data-lucide="sparkles"></i> Régénérer';
       if (icon) {
         icon.setAttribute('data-lucide', 'check-circle');
@@ -364,48 +407,41 @@ async function genererEtape(i) {
       }
       lucide.createIcons();
     } else {
-      contenu.innerHTML =
-        '<span style="color:var(--danger)">Erreur : ' + data.erreur + '</span>';
+      const errMsg = (meta && meta.erreur) || 'Réessaie dans quelques secondes.';
+      contenu.innerHTML +=
+        '<div style="color:var(--danger);margin-top:8px">Erreur : ' + errMsg + '</div>';
     }
-  } catch(e) {
+  } catch (e) {
     loading.style.display = 'none';
     contenu.innerHTML =
       '<span style="color:var(--danger)">Erreur : ' + e.message + '</span>';
   }
+
   btn.disabled = false;
 }
 
-async function genererSection(sid) {
-  const btn     = document.getElementById('btnSec' + sid);
-  const loading = document.getElementById('loading-' + sid);
-  const contenu = document.getElementById('contenu-' + sid);
-
-  btn.disabled          = true;
-  loading.style.display = 'block';
-
-  try {
-    const r = await fetch('/cer/generer-section/' + CER_ID, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ section: sid })
-    });
-    const data = await r.json();
-    loading.style.display = 'none';
-
-    if (data.ok) {
-      contenu.innerHTML = data.contenu.replace(/\n/g, '<br>');
-      btn.innerHTML     = '<i data-lucide="sparkles"></i> Régénérer';
-      lucide.createIcons();
-    } else {
-      contenu.innerHTML =
-        '<span style="color:var(--danger)">Erreur : ' + data.erreur + '</span>';
+async function genererEtape(i) {
+  await streamerSection(
+    { section: 'realisation_etape', etape_index: i },
+    {
+      btn:     document.getElementById('btnEtape' + i),
+      loading: document.getElementById('loading-etape-' + i),
+      contenu: document.getElementById('contenu-etape-' + i),
+      icon:    document.getElementById('icon-etape-' + i),
     }
-  } catch(e) {
-    loading.style.display = 'none';
-    contenu.innerHTML =
-      '<span style="color:var(--danger)">Erreur : ' + e.message + '</span>';
-  }
-  btn.disabled = false;
+  );
+}
+
+async function genererSection(sid) {
+  await streamerSection(
+    { section: sid },
+    {
+      btn:     document.getElementById('btnSec' + sid),
+      loading: document.getElementById('loading-' + sid),
+      contenu: document.getElementById('contenu-' + sid),
+      icon:    null,
+    }
+  );
 }
 
 async function genererToutesEtapes() {
@@ -432,6 +468,31 @@ async function genererTout() {
   }
 
   loading.style.display = 'none';
+}
+
+async function partagerCer() {
+  const box = document.getElementById('shareBox');
+  const input = document.getElementById('shareUrl');
+  try {
+    const r = await fetch('{{ url_for("cer.partager", id=cer.id) }}', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      input.value = data.url;
+      box.style.display = 'flex';
+      lucide.createIcons();
+      input.select();
+    } else {
+      alert('Erreur : ' + data.erreur);
+    }
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+  }
+}
+
+function copierLienPartage() {
+  const input = document.getElementById('shareUrl');
+  input.select();
+  navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
 }
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 from app.extensions import db
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 UTC = timezone.utc
@@ -111,12 +111,19 @@ class SessionRevision(db.Model):
     contenu_source = db.Column(db.Text,        nullable=True)
     cours_genere   = db.Column(db.Text,        nullable=True)
     niveau_quiz    = db.Column(db.Integer,     default=1)
+    share_token    = db.Column(db.String(36),  unique=True, nullable=True)
     created_at     = db.Column(db.DateTime,
                                 default=lambda: datetime.now(UTC))
 
     # Relation avec les quiz
     quiz_results = db.relationship(
         'QuizResult', backref='session',
+        lazy=True, cascade='all, delete-orphan'
+    )
+
+    # Relation avec les flashcards
+    flashcards = db.relationship(
+        'Flashcard', backref='session',
         lazy=True, cascade='all, delete-orphan'
     )
 
@@ -142,6 +149,44 @@ class QuizResult(db.Model):
         if self.details:
             return json.loads(self.details)
         return []
+
+
+# ─── Modèle : Flashcard (révision espacée, système de Leitner) ────────────────
+class Flashcard(db.Model):
+    __tablename__ = 'flashcards'
+
+    # Intervalles (en jours) par boîte Leitner : 1 -> revoir demain, 5 -> tous les mois
+    INTERVALLES = {1: 1, 2: 3, 3: 7, 4: 14, 5: 30}
+    NB_BOITES = 5
+
+    id                  = db.Column(db.Integer, primary_key=True)
+    session_id          = db.Column(db.Integer,
+                                     db.ForeignKey('sessions_revision.id'),
+                                     nullable=False)
+    question            = db.Column(db.Text, nullable=False)
+    reponse             = db.Column(db.Text, nullable=False)
+    boite               = db.Column(db.Integer, default=1)  # 1 (nouveau) à 5 (maîtrisé)
+    prochaine_revision  = db.Column(db.Date, nullable=False,
+                                     default=lambda: datetime.now(UTC).date())
+    derniere_revision   = db.Column(db.DateTime, nullable=True)
+    nb_revisions        = db.Column(db.Integer, default=0)
+    created_at          = db.Column(db.DateTime,
+                                     default=lambda: datetime.now(UTC))
+
+    def repondre(self, connu: bool):
+        """Fait avancer la carte dans le système de Leitner."""
+        self.nb_revisions += 1
+        self.derniere_revision = datetime.now(UTC)
+        if connu:
+            self.boite = min(self.boite + 1, self.NB_BOITES)
+        else:
+            self.boite = 1
+        jours = self.INTERVALLES.get(self.boite, 1)
+        self.prochaine_revision = datetime.now(UTC).date() + timedelta(days=jours)
+
+    def __repr__(self):
+        return f'<Flashcard {self.question[:40]}>'
+
 
 class SessionCER(db.Model):
     __tablename__ = 'sessions_cer'
@@ -179,6 +224,8 @@ class SessionCER(db.Model):
 
     statut          = db.Column(db.String(50), default='brouillon')
     # brouillon / genere / complet
+
+    share_token     = db.Column(db.String(36), unique=True, nullable=True)
 
     created_at      = db.Column(db.DateTime,
                                  default=lambda: datetime.now(UTC))
@@ -230,3 +277,78 @@ class SessionQA(db.Model):
 
     def __repr__(self):
         return f'<SessionQA {self.question[:40]}>'
+
+
+# ─── Modèle : Projet (suivi de projets) ────────────────────────────────────────
+class Projet(db.Model):
+    __tablename__ = 'projets'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    nom         = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text,        nullable=True)
+    statut      = db.Column(db.String(20),  default='en_cours')
+    # en_cours / termine / en_pause
+    priorite    = db.Column(db.String(10),  default='normale')
+    # basse / normale / haute
+    date_debut  = db.Column(db.Date,        nullable=True)
+    echeance    = db.Column(db.Date,        nullable=True)
+    created_at  = db.Column(db.DateTime,    default=lambda: datetime.now(UTC))
+    updated_at  = db.Column(db.DateTime,    default=lambda: datetime.now(UTC),
+                             onupdate=lambda: datetime.now(UTC))
+
+    taches = db.relationship(
+        'Tache', backref='projet', lazy=True,
+        cascade='all, delete-orphan', order_by='Tache.ordre'
+    )
+
+    def jours_restants(self):
+        if not self.echeance:
+            return None
+        return (self.echeance - datetime.now(UTC).date()).days
+
+    def progression(self):
+        if not self.taches:
+            return 0
+        terminees = sum(1 for t in self.taches if t.statut == 'termine')
+        return int((terminees / len(self.taches)) * 100)
+
+    def __repr__(self):
+        return f'<Projet {self.nom}>'
+
+
+# ─── Modèle : Tâche (kanban d'un projet) ───────────────────────────────────────
+class Tache(db.Model):
+    __tablename__ = 'taches'
+
+    id         = db.Column(db.Integer, primary_key=True)
+    projet_id  = db.Column(db.Integer, db.ForeignKey('projets.id'), nullable=False)
+    titre      = db.Column(db.String(300), nullable=False)
+    statut     = db.Column(db.String(20),  default='a_faire')
+    # a_faire / en_cours / termine
+    echeance   = db.Column(db.Date,        nullable=True)
+    ordre      = db.Column(db.Integer,     default=0)
+    created_at = db.Column(db.DateTime,    default=lambda: datetime.now(UTC))
+
+    def __repr__(self):
+        return f'<Tache {self.titre[:40]}>'
+
+
+# ─── Modèle : Activité journalière (journal de temps) ─────────────────────────
+class ActiviteJournaliere(db.Model):
+    __tablename__ = 'activites_journalieres'
+
+    CATEGORIES = ['Projet', 'Certification', 'Cours', 'Révision', 'Autre']
+
+    id            = db.Column(db.Integer, primary_key=True)
+    titre         = db.Column(db.String(300), nullable=False)
+    categorie     = db.Column(db.String(50),  default='Autre')
+    duree_minutes = db.Column(db.Integer,     nullable=False)
+    date_activite = db.Column(db.Date, nullable=False,
+                               default=lambda: datetime.now(UTC).date())
+    projet_id     = db.Column(db.Integer, db.ForeignKey('projets.id'), nullable=True)
+    created_at    = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+
+    projet = db.relationship('Projet', backref=db.backref('activites', lazy=True))
+
+    def __repr__(self):
+        return f'<ActiviteJournaliere {self.titre[:40]}>'

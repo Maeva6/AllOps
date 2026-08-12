@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Révision IA / Progression{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Progression</h1>
+    <p>Évolution de tes scores de quiz au fil du temps</p>
+  </div>
+  <a href="{{ url_for('revision.index') }}" class="btn btn-secondary">
+    <i data-lucide="arrow-left"></i> Retour
+  </a>
+</div>
+
+{% if nb_quiz == 0 %}
+  <div style="text-align:center;padding:64px 20px">
+    <i data-lucide="line-chart"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">Pas encore de quiz complété — les statistiques apparaîtront ici.</p>
+  </div>
+{% else %}
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="flex items-center justify-between">
+        <span class="stat-label">Quiz complétés</span>
+        <i data-lucide="check-square" class="stat-icon text-accent"></i>
+      </div>
+      <div class="stat-value text-accent">{{ nb_quiz }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="flex items-center justify-between">
+        <span class="stat-label">Score moyen</span>
+        <i data-lucide="target" class="stat-icon text-success"></i>
+      </div>
+      <div class="stat-value text-success">{{ moyenne_globale }}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="flex items-center justify-between">
+        <span class="stat-label">Domaines pratiqués</span>
+        <i data-lucide="layers" class="stat-icon text-secondary"></i>
+      </div>
+      <div class="stat-value">{{ moyenne_par_domaine|length }}</div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <i data-lucide="line-chart" class="header-icon"></i>
+      Évolution du score (%)
+    </div>
+    <div class="card-body">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+           style="width:100%;height:220px;display:block">
+        <line x1="0" y1="0"   x2="100" y2="0"   stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="25"  x2="100" y2="25"  stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="50"  x2="100" y2="50"  stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="75"  x2="100" y2="75"  stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="100" x2="100" y2="100" stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke"/>
+        <polyline points="{{ polyline }}" fill="none" stroke="var(--accent)"
+                  stroke-width="1.2" vector-effect="non-scaling-stroke"
+                  stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <div class="flex justify-between text-xs text-muted mt-1">
+        <span>100%</span>
+        <span style="margin-left:auto">0%</span>
+      </div>
+    </div>
+  </div>
+
+  {% if moyenne_par_domaine %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i data-lucide="layers" class="header-icon"></i>
+      Score moyen par domaine
+    </div>
+    <div class="card-body flex flex-col gap-2">
+      {% for dom, moy in moyenne_par_domaine.items() %}
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="text-sm">{{ domaines.get(dom, dom)|capitalize }}</span>
+          <span class="text-sm font-medium">{{ moy }}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill {{ 'success' if moy >= 70 else ('warning' if moy >= 40 else 'danger') }}"
+               style="width:{{ moy }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Cours</th>
+          <th>Domaine</th>
+          <th>Niveau</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in points|reverse %}
+        <tr>
+          <td class="muted">{{ p.date.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>{{ p.titre }}</td>
+          <td class="muted">{{ domaines.get(p.domaine, p.domaine)|capitalize }}</td>
+          <td class="muted">{{ p.niveau }}</td>
+          <td>
+            <span class="badge {{ 'badge-success' if p.pct >= 70 else ('badge-warning' if p.pct >= 40 else 'badge-danger') }}">
+              {{ p.pct }}%
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endif %}
+{% endblock %}

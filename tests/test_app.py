@@ -51,6 +51,52 @@ class TestPages:
         assert r.status_code == 404
 
 
+# ─── Tests : Rappels de deadlines ─────────────────────────────────────────────
+class TestRappelsDeadlines:
+
+    def test_pas_de_banniere_sans_deadline_proche(self, client):
+        r = client.get('/')
+        assert 'échéance proche' not in r.get_data(as_text=True)
+
+    def test_banniere_deadline_proche(self, client, app):
+        from datetime import date, timedelta
+        with app.app_context():
+            db.session.add(Certification(
+                nom='AWS SAA', organisme='AWS', categorie='Cloud',
+                statut='En cours', deadline=date.today() + timedelta(days=5)
+            ))
+            db.session.commit()
+
+        r = client.get('/')
+        text = r.get_data(as_text=True)
+        assert 'échéance proche' in text
+        assert 'AWS SAA' in text
+
+    def test_certification_validee_pas_dans_la_banniere(self, client, app):
+        from datetime import date, timedelta
+        with app.app_context():
+            db.session.add(Certification(
+                nom='Déjà validée', organisme='X', categorie='Y',
+                statut='Validée', deadline=date.today() + timedelta(days=2)
+            ))
+            db.session.commit()
+
+        r = client.get('/')
+        assert 'échéance proche' not in r.get_data(as_text=True)
+
+    def test_deadline_lointaine_pas_dans_la_banniere(self, client, app):
+        from datetime import date, timedelta
+        with app.app_context():
+            db.session.add(Certification(
+                nom='Loin devant', organisme='X', categorie='Y',
+                statut='A faire', deadline=date.today() + timedelta(days=90)
+            ))
+            db.session.commit()
+
+        r = client.get('/')
+        assert 'échéance proche' not in r.get_data(as_text=True)
+
+
 # ─── Tests : Modèle Certification ────────────────────────────────────────────
 class TestModeles:
 
@@ -212,3 +258,39 @@ class TestFichiers:
         # Cas 2 : Réponse 404 classique
         else:
             assert response.status_code == 404
+
+
+# ─── Tests : Pagination ───────────────────────────────────────────────────────
+class TestPagination:
+    """Les listes paginées ne doivent jamais planter, page dans les clous ou non."""
+
+    @pytest.mark.parametrize("url", [
+        '/cer/', '/cer/?page=1', '/cer/?page=999',
+        '/revision/', '/revision/?page=999',
+        '/correction/', '/correction/?page=999',
+        '/certifications/', '/certifications/?page=999',
+        '/files/historique', '/files/historique?page=999',
+    ])
+    def test_pages_ne_plantent_pas(self, client, url):
+        response = client.get(url)
+        assert response.status_code == 200
+
+    def test_cer_pagination_deuxieme_page(self, client, app):
+        from app.models import SessionCER
+        import json as json_module
+        with app.app_context():
+            for i in range(15):
+                db.session.add(SessionCER(
+                    titre_prosit=f'Prosit {i}', etudiant='Test',
+                    contexte='c', besoins='b', problematique='p',
+                    plan_action=json_module.dumps(['Étape 1']),
+                ))
+            db.session.commit()
+
+        page1 = client.get('/cer/?page=1')
+        page2 = client.get('/cer/?page=2')
+        assert page1.status_code == 200
+        assert page2.status_code == 200
+        assert 'Prosit 0' in page1.data.decode() or 'Prosit 14' in page1.data.decode()
+        # La page 2 doit contenir des CER absents de la page 1
+        assert page1.data != page2.data

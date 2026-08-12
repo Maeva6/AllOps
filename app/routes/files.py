@@ -565,12 +565,15 @@ def annuler_organisation(id):
 # ─── Historique des organisations ─────────────────────────────────────────────
 @files_bp.route('/historique')
 def historique():
-    snapshots = FileOperation.query.order_by(
+    page = request.args.get('page', 1, type=int)
+    pagination = FileOperation.query.order_by(
         FileOperation.created_at.desc()
-    ).all()
+    ).paginate(page=page, per_page=20, error_out=False)
     return render_template('modules/historique.html',
                            title="Historique",
-                           snapshots=snapshots)
+                           snapshots=pagination.items,
+                           pagination=pagination,
+                           pagination_endpoint='files.historique')
 
 
 

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Révision IA / Flashcards{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>Flashcards — {{ session_obj.titre }}</h1>
+    <p>Révision espacée (méthode Leitner) : les cartes reviennent plus ou moins souvent selon ta maîtrise</p>
+  </div>
+  <a href="{{ url_for('revision.voir_cours', id=session_obj.id) }}" class="btn btn-secondary">
+    <i data-lucide="arrow-left"></i> Retour au cours
+  </a>
+</div>
+
+{% if total == 0 %}
+  <div style="text-align:center;padding:64px 20px">
+    <i data-lucide="layers"
+       style="width:48px;height:48px;color:var(--text-muted);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary mb-3">Aucune flashcard pour ce cours pour l'instant</p>
+    <button class="btn btn-primary" id="btnGenererCartes" onclick="genererCartes()">
+      <i data-lucide="sparkles"></i> Générer les flashcards avec l'IA
+    </button>
+    <div id="genLoading" style="display:none;margin-top:16px" class="text-muted text-sm">
+      Génération en cours…
+    </div>
+  </div>
+
+{% elif not a_revoir %}
+  <div style="text-align:center;padding:64px 20px">
+    <i data-lucide="check-circle"
+       style="width:48px;height:48px;color:var(--success);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">
+      Rien à réviser aujourd'hui — {{ total }} carte{{ 's' if total > 1 else '' }} au total.
+      Reviens plus tard !
+    </p>
+  </div>
+
+{% else %}
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-sm text-muted" id="compteur">1 / {{ a_revoir|length }}</span>
+    <span class="badge badge-accent" id="boiteBadge"></span>
+  </div>
+
+  <div class="card" style="max-width:640px;margin:0 auto">
+    <div class="card-body" style="min-height:220px;display:flex;flex-direction:column;
+                                   align-items:center;justify-content:center;text-align:center;
+                                   padding:40px 24px">
+      <div class="text-xs text-muted mb-2" id="faceLabel">QUESTION</div>
+      <div id="carteTexte" style="font-size:16px;line-height:1.6"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:12px">
+      <button class="btn btn-secondary" id="btnRevele" onclick="revelerReponse()">
+        <i data-lucide="eye"></i> Voir la réponse
+      </button>
+      <button class="btn btn-danger" id="btnNonSu" style="display:none" onclick="repondre(false)">
+        <i data-lucide="x"></i> Je ne savais pas
+      </button>
+      <button class="btn btn-success" id="btnSu" style="display:none" onclick="repondre(true)">
+        <i data-lucide="check"></i> Je savais
+      </button>
+    </div>
+  </div>
+
+  <div id="finMessage" style="display:none;text-align:center;padding:64px 20px">
+    <i data-lucide="party-popper"
+       style="width:48px;height:48px;color:var(--success);
+              margin:0 auto 16px;display:block;stroke-width:1.5"></i>
+    <p class="text-secondary">Session terminée !</p>
+  </div>
+
+  <script>
+    const CARTES = {{ a_revoir|map(attribute='id')|list | tojson }};
+    const QUESTIONS = {{ a_revoir|map(attribute='question')|list | tojson }};
+    const REPONSES  = {{ a_revoir|map(attribute='reponse')|list | tojson }};
+    let index = 0;
+
+    function afficherCarte() {
+      document.getElementById('carteTexte').textContent = QUESTIONS[index];
+      document.getElementById('faceLabel').textContent = 'QUESTION';
+      document.getElementById('compteur').textContent = (index + 1) + ' / ' + CARTES.length;
+      document.getElementById('btnRevele').style.display = 'inline-flex';
+      document.getElementById('btnSu').style.display = 'none';
+      document.getElementById('btnNonSu').style.display = 'none';
+      document.getElementById('boiteBadge').textContent = '';
+    }
+
+    function revelerReponse() {
+      document.getElementById('carteTexte').textContent = REPONSES[index];
+      document.getElementById('faceLabel').textContent = 'RÉPONSE';
+      document.getElementById('btnRevele').style.display = 'none';
+      document.getElementById('btnSu').style.display = 'inline-flex';
+      document.getElementById('btnNonSu').style.display = 'inline-flex';
+    }
+
+    async function repondre(connu) {
+      const fid = CARTES[index];
+      try {
+        const r = await fetch(`/revision/flashcards/${fid}/repondre`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connu })
+        });
+        const data = await r.json();
+        if (data.ok) {
+          document.getElementById('boiteBadge').textContent =
+            'Boîte ' + data.boite + ' · prochaine révision le ' + data.prochaine_revision;
+        }
+      } catch (e) { /* on continue même si la requête échoue */ }
+
+      index++;
+      if (index >= CARTES.length) {
+        document.querySelector('.card').style.display = 'none';
+        document.getElementById('compteur').style.display = 'none';
+        document.getElementById('finMessage').style.display = 'block';
+      } else {
+        afficherCarte();
+      }
+    }
+
+    afficherCarte();
+  </script>
+{% endif %}
+
+<script>
+  async function genererCartes() {
+    const btn = document.getElementById('btnGenererCartes');
+    const loading = document.getElementById('genLoading');
+    btn.disabled = true;
+    loading.style.display = 'block';
+    try {
+      const r = await fetch('{{ url_for("revision.flashcards_generer", id=session_obj.id) }}', {
+        method: 'POST'
+      });
+      const data = await r.json();
+      if (data.ok) {
+        window.location.reload();
+      } else {
+        alert('Erreur : ' + data.erreur);
+        btn.disabled = false;
+        loading.style.display = 'none';
+      }
+    } catch (e) {
+      alert('Erreur : ' + e.message);
+      btn.disabled = false;
+      loading.style.display = 'none';
+    }
+  }
+</script>
+
+{% endblock %}

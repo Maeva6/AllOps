@@ -45,6 +45,7 @@ application.
 - Bannière de rappel pour les certifications dont la deadline approche (≤ 30 jours)
 - Recherche globale (`/recherche`) sur les certifications, CER, révisions, corrections et questions de cours
 - Thème clair/sombre persisté côté serveur (même préférence sur tous les appareils)
+- **Notifications navigateur** (opt-in, icône cloche) : échéances de certifications/tâches/projets à ≤ 3 jours, une fois par élément et par jour
 
 ### Automatisation de fichiers
 - Renommage en masse selon un pattern
@@ -65,7 +66,7 @@ application.
 - Tableau **Kanban** par projet (À faire / En cours / Terminé)
 - Tâches liables à une **Certification** ou à un **CER** existant
 - **Journal d'activité** : enregistrement du temps passé (titre, durée, catégorie), avec ou sans lien vers un projet
-- **Minuteur start/stop** en plus de la saisie manuelle, avec reprise automatique si on change de page
+- **Minuteur start/stop** en plus de la saisie manuelle, avec reprise automatique si on change de page et notification navigateur optionnelle quand une durée cible est atteinte
 - Dashboard temps : total du jour/de la semaine, répartition par catégorie
 
 ### CER (Compte-Rendu d'Étude / rapports type PROSIT)
@@ -233,7 +234,7 @@ AllOps/
 │   │   ├── partage.py       # Liens de partage publics (CER, révision)
 │   │   ├── parametres.py    # Préférences persistées (thème)
 │   │   └── detente.py       # Mini-jeux
-│   ├── services/             # Logique métier (génération IA, exports, extraction...)
+│   ├── services/             # Logique métier (génération IA, exports, extraction, notifications...)
 │   ├── static/                # Assets statiques (CSS, JS, polices, Lucide)
 │   └── templates/             # Templates Jinja2
 ├── migrations/                # Migrations Alembic (Flask-Migrate)
@@ -262,8 +263,10 @@ s'exécute sur chaque push/PR vers `main` et `develop`, en 4 jobs :
 ## Roadmap / améliorations envisagées
 
 - [ ] Authentification multi-utilisateurs (le projet est actuellement mono-utilisateur)
+- [ ] Notifications par Web Push (fonctionnant même onglet/navigateur fermé) — nécessiterait HTTPS, un service worker et une tâche planifiée côté serveur ; les notifications actuelles sont des notifications navigateur classiques, actives seulement onglet ouvert
 
 Déjà fait :
+- [x] Notifications navigateur opt-in (`app/services/notifications.py`) : échéances proches (certifications, tâches, projets) et fin de minuteur avec durée cible
 - [x] Mode clair/sombre persistant côté serveur (modèle `Parametre`, plus seulement en `localStorage`) — la préférence est la même sur tous les appareils
 - [x] Couverture de tests IA étendue aux cas d'erreur réseau/quota réels (`tests/test_ai_errors.py`), avec de vraies classes d'exception du SDK Groq (`AuthenticationError`, `RateLimitError`, `APIConnectionError`...) plutôt que des mocks approximatifs
 - [x] Minuteur start/stop pour le journal d'activité (en plus de la saisie manuelle de la durée), avec reprise automatique si on quitte la page

@@ -157,6 +157,24 @@ class TestTaches:
             projet = db.session.get(Projet, sample_projet)
             assert projet.progression() == 50
 
+    def test_tache_jours_restants(self, app, sample_projet):
+        from datetime import timedelta, datetime, timezone
+        with app.app_context():
+            tache = Tache(
+                projet_id=sample_projet, titre='Avec échéance',
+                echeance=(datetime.now(timezone.utc).date() + timedelta(days=4)),
+            )
+            db.session.add(tache)
+            db.session.commit()
+            assert tache.jours_restants() == 4
+
+    def test_tache_jours_restants_sans_echeance(self, app, sample_projet):
+        with app.app_context():
+            tache = Tache(projet_id=sample_projet, titre='Sans échéance')
+            db.session.add(tache)
+            db.session.commit()
+            assert tache.jours_restants() is None
+
 
 # ─── Tests : Journal d'activité ─────────────────────────────────────────────
 class TestJournal:

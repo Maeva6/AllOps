@@ -109,6 +109,12 @@
            style="width:200px;padding:7px 12px;font-size:12.5px">
   </form>
 
+  <!-- Notifications navigateur -->
+  <button class="theme-toggle" id="notifToggle" title="Activer/désactiver les notifications">
+    <i data-lucide="bell"     id="iconBellOn"  style="display:none"></i>
+    <i data-lucide="bell-off" id="iconBellOff"></i>
+  </button>
+
   <!-- Toggle thème -->
   <button class="theme-toggle" id="themeToggle" title="Changer le thème">
     <i data-lucide="sun" id="iconLight"  style="display:none"></i>
@@ -194,6 +200,79 @@
       updateIcons(nouveau);
       persistTheme(nouveau);
     });
+
+    // ── Notifications navigateur ──────────────────────────────────────
+    // Opt-in (bouton cloche) : la permission navigateur seule ne suffit
+    // pas, l'utilisateur doit aussi activer les notifications côté appli
+    // (drapeau localStorage), pour pouvoir les couper sans révoquer la
+    // permission dans les réglages du navigateur.
+    const NOTIF_FLAG  = 'allops-notifs-actives';
+    const notifToggle = document.getElementById('notifToggle');
+    const iconBellOn  = document.getElementById('iconBellOn');
+    const iconBellOff = document.getElementById('iconBellOff');
+
+    function notifsActives() {
+      return !!window.Notification
+        && Notification.permission === 'granted'
+        && localStorage.getItem(NOTIF_FLAG) === '1';
+    }
+
+    function majIconeCloche() {
+      if (!notifToggle) return;
+      const actif = notifsActives();
+      iconBellOn.style.display  = actif ? 'block' : 'none';
+      iconBellOff.style.display = actif ? 'none' : 'block';
+    }
+
+    window.AllOpsNotify = {
+      actives: notifsActives,
+      envoyer(titre, options) {
+        if (!notifsActives()) return null;
+        try { return new Notification(titre, options); }
+        catch (e) { console.warn('Notification impossible :', e); return null; }
+      },
+    };
+
+    if (!window.Notification) {
+      if (notifToggle) notifToggle.style.display = 'none';
+    } else {
+      majIconeCloche();
+
+      notifToggle?.addEventListener('click', async () => {
+        if (localStorage.getItem(NOTIF_FLAG) === '1') {
+          localStorage.setItem(NOTIF_FLAG, '0');
+          majIconeCloche();
+          return;
+        }
+        let permission = Notification.permission;
+        if (permission === 'default') {
+          permission = await Notification.requestPermission();
+        }
+        if (permission === 'granted') {
+          localStorage.setItem(NOTIF_FLAG, '1');
+          majIconeCloche();
+          new Notification('AllOps', { body: 'Notifications activées ✅' });
+        }
+      });
+
+      // Échéances proches (certifications, tâches, projets) : une seule
+      // notification par élément et par jour, quelle que soit la page
+      // visitée (liste calculée côté serveur, voir app/services/notifications.py).
+      const elementsUrgents = {{ elements_urgents | tojson }};
+      const aujourdhui = new Date().toISOString().slice(0, 10);
+      elementsUrgents.forEach((el) => {
+        if (el.jours_restants === null || el.jours_restants > 3) return;
+        const cle = `allops-notif-${el.type}-${el.id}-${aujourdhui}`;
+        if (localStorage.getItem(cle)) return;
+        localStorage.setItem(cle, '1');
+
+        const libelle = el.jours_restants <= 0
+          ? "Échéance aujourd'hui"
+          : `Échéance dans ${el.jours_restants} jour${el.jours_restants > 1 ? 's' : ''}`;
+
+        window.AllOpsNotify.envoyer(`AllOps — ${libelle}`, { body: el.titre });
+      });
+    }
 
     // ── Sidebar mobile ─────────────────────────────────────────────────
     const sidebar  = document.querySelector('.sidebar');

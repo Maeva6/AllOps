@@ -40,7 +40,7 @@
   </div>
   <div class="card-body">
     <form id="timerForm" action="{{ url_for('projets.ajouter_activite') }}" method="POST">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px">
+      <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:14px">
         <div class="form-group mb-0">
           <label class="form-label">Titre *</label>
           <input type="text" name="titre" id="timerTitre" class="form-control"
@@ -62,6 +62,11 @@
               <option value="{{ p.id }}">{{ p.nom }}</option>
             {% endfor %}
           </select>
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">Durée cible (min)</label>
+          <input type="number" id="timerCible" class="form-control"
+                 min="1" step="1" placeholder="Optionnel, ex : 25">
         </div>
       </div>
 
@@ -216,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const titreInput  = document.getElementById('timerTitre');
   const catSelect    = document.getElementById('timerCategorie');
   const projetSelect = document.getElementById('timerProjet');
+  const cibleInput   = document.getElementById('timerCible');
   const dureeInput   = document.getElementById('timerDuree');
   const affichage    = document.getElementById('timerAffichage');
   const btnDemarrer  = document.getElementById('timerDemarrer');
@@ -232,13 +238,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${h}:${m}:${s}`;
   }
 
-  function tick(debut) {
-    affichage.textContent = formaterDuree(Date.now() - debut);
+  function tick(etat) {
+    const ecoule = Date.now() - etat.debut;
+    affichage.textContent = formaterDuree(ecoule);
+
+    // Durée cible atteinte : une seule notification, le chrono continue.
+    if (etat.cible && !etat.notifie && ecoule >= etat.cible * 60000) {
+      etat.notifie = true;
+      localStorage.setItem(STOCKAGE_CLE, JSON.stringify(etat));
+      const n = window.AllOpsNotify.envoyer('AllOps — Minuteur terminé', {
+        body: `« ${etat.titre} » — ${etat.cible} min atteintes. Le chrono continue si tu ne l'arrêtes pas.`,
+      });
+      if (n) n.onclick = () => window.focus();
+    }
   }
 
-  function demarrerAffichage(debut) {
-    tick(debut);
-    intervalId = setInterval(() => tick(debut), 1000);
+  function demarrerAffichage(etat) {
+    tick(etat);
+    intervalId = setInterval(() => tick(etat), 1000);
   }
 
   function passerEnCours() {
@@ -252,8 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
     titreInput.value  = enCours.titre;
     catSelect.value    = enCours.categorie;
     if (projetSelect) projetSelect.value = enCours.projetId || '';
+    if (cibleInput) cibleInput.value = enCours.cible || '';
     passerEnCours();
-    demarrerAffichage(enCours.debut);
+    demarrerAffichage(enCours);
   }
 
   btnDemarrer.addEventListener('click', () => {
@@ -265,16 +283,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     erreur.style.display = 'none';
 
-    const debut = Date.now();
-    localStorage.setItem(STOCKAGE_CLE, JSON.stringify({
-      debut,
+    const cibleValeur = cibleInput ? parseInt(cibleInput.value, 10) : NaN;
+    const etat = {
+      debut: Date.now(),
       titre,
       categorie: catSelect.value,
       projetId: projetSelect ? projetSelect.value : '',
-    }));
+      cible: (!isNaN(cibleValeur) && cibleValeur > 0) ? cibleValeur : null,
+      notifie: false,
+    };
+    localStorage.setItem(STOCKAGE_CLE, JSON.stringify(etat));
 
     passerEnCours();
-    demarrerAffichage(debut);
+    demarrerAffichage(etat);
   });
 
   form.addEventListener('submit', (evt) => {

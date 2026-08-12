@@ -334,6 +334,11 @@ class Tache(db.Model):
     certification = db.relationship('Certification', backref=db.backref('taches_liees', lazy=True))
     cer           = db.relationship('SessionCER', backref=db.backref('taches_liees', lazy=True))
 
+    def jours_restants(self):
+        if not self.echeance:
+            return None
+        return (self.echeance - datetime.now(UTC).date()).days
+
     def __repr__(self):
         return f'<Tache {self.titre[:40]}>'
 

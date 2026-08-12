@@ -19,6 +19,7 @@ from app.routes.projets import projets_bp
 from app.models import Projet, Tache, ActiviteJournaliere
 from app.routes.parametres import parametres_bp
 from app.models import Parametre
+from app.services.notifications import get_elements_urgents
 from datetime import datetime, timezone
 
 def create_app(config_class=Config):
@@ -52,5 +53,9 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_theme():
         return {'theme_actuel': Parametre.get().theme}
+
+    @app.context_processor
+    def inject_elements_urgents():
+        return {'elements_urgents': get_elements_urgents()}
 
     return app

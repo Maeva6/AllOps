@@ -34,7 +34,7 @@ Format exact :
 """
 
     response = safe_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",

@@ -677,7 +677,7 @@ def generer_section_cer(
         return ""
 
     response = safe_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=3000,
@@ -706,7 +706,7 @@ def generer_section_cer_stream(
         return
 
     yield from stream_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=3000,

@@ -97,7 +97,7 @@ Mode de réponse : {instruction}"""
         fragments = []
         try:
             for delta in stream_chat_completion(
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": user_prompt}

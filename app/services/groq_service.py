@@ -73,13 +73,13 @@ Utilise le format Markdown avec :
 def generer_cours(titre: str, domaine: str,
                   contenu_source: str = "") -> str:
     """
-    Génère un cours détaillé et structuré via Groq (llama3-70b).
+    Génère un cours détaillé et structuré via Groq (gpt-oss-120b).
     Retourne du Markdown.
     """
     prompt = _construire_prompt_cours(titre, domaine, contenu_source)
 
     response = safe_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=3000,
@@ -93,7 +93,7 @@ def generer_cours_stream(titre: str, domaine: str, contenu_source: str = ""):
     prompt = _construire_prompt_cours(titre, domaine, contenu_source)
 
     yield from stream_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=3000,

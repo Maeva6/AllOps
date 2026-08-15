@@ -212,7 +212,7 @@ Format EXACT (respecte-le scrupuleusement) :
 ]"""
 
     response = safe_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
@@ -285,7 +285,7 @@ Génère un paragraphe de synthèse pédagogique (150-200 mots) qui :
 Réponds uniquement avec le texte du paragraphe.
 """
     response = safe_chat_completion(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.5,
         max_tokens=400,

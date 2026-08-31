@@ -86,6 +86,7 @@
       <p id="timerErreur" class="text-xs" style="color:var(--danger);display:none;margin-top:6px">
         Renseigne un titre avant de démarrer le minuteur.
       </p>
+      <p id="timerAvis" class="text-xs text-warning" style="display:none;margin-top:6px"></p>
     </form>
   </div>
 </div>
@@ -227,8 +228,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDemarrer  = document.getElementById('timerDemarrer');
   const btnArreter   = document.getElementById('timerArreter');
   const erreur       = document.getElementById('timerErreur');
+  const avis         = document.getElementById('timerAvis');
+  const ICONE_TIMER  = "{{ url_for('static', filename='icons/notif-timer.svg') }}";
 
   let intervalId = null;
+
+  function afficherAvis(message) {
+    if (!avis) return;
+    avis.textContent = message;
+    avis.style.display = message ? 'block' : 'none';
+  }
 
   function formaterDuree(ms) {
     const totalSec = Math.floor(ms / 1000);
@@ -246,10 +255,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (etat.cible && !etat.notifie && ecoule >= etat.cible * 60000) {
       etat.notifie = true;
       localStorage.setItem(STOCKAGE_CLE, JSON.stringify(etat));
-      const n = window.AllOpsNotify.envoyer('AllOps — Minuteur terminé', {
-        body: `« ${etat.titre} » — ${etat.cible} min atteintes. Le chrono continue si tu ne l'arrêtes pas.`,
+      const n = window.AllOpsNotify.envoyer('Minuteur terminé', {
+        body: `« ${etat.titre} » : ${etat.cible} minutes écoulées. Le chrono continue tant que tu ne l'arrêtes pas.`,
+        icon: ICONE_TIMER,
       });
-      if (n) n.onclick = () => window.focus();
+      if (n) {
+        n.onclick = () => window.focus();
+      } else {
+        afficherAvis("La notification n'a pas pu être envoyée : vérifie que les notifications sont autorisées via la cloche en haut de page.");
+      }
     }
   }
 
@@ -274,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     demarrerAffichage(enCours);
   }
 
-  btnDemarrer.addEventListener('click', () => {
+  btnDemarrer.addEventListener('click', async () => {
     const titre = titreInput.value.trim();
     if (!titre) {
       erreur.style.display = 'block';
@@ -282,14 +296,26 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     erreur.style.display = 'none';
+    afficherAvis('');
 
     const cibleValeur = cibleInput ? parseInt(cibleInput.value, 10) : NaN;
+    const cible = (!isNaN(cibleValeur) && cibleValeur > 0) ? cibleValeur : null;
+
+    if (!cible) {
+      afficherAvis('Aucune alerte ne sera envoyée : indique une durée cible pour être notifié(e) à la fin.');
+    } else if (window.AllOpsNotify && !window.AllOpsNotify.actives()) {
+      const activee = await window.AllOpsNotify.activer();
+      if (!activee) {
+        afficherAvis('Notifications désactivées : active-les via la cloche en haut de page pour être alerté(e) à la fin du minuteur.');
+      }
+    }
+
     const etat = {
       debut: Date.now(),
       titre,
       categorie: catSelect.value,
       projetId: projetSelect ? projetSelect.value : '',
-      cible: (!isNaN(cibleValeur) && cibleValeur > 0) ? cibleValeur : null,
+      cible,
       notifie: false,
     };
     localStorage.setItem(STOCKAGE_CLE, JSON.stringify(etat));

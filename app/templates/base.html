@@ -206,10 +206,9 @@
     // pas, l'utilisateur doit aussi activer les notifications côté appli
     // (drapeau localStorage), pour pouvoir les couper sans révoquer la
     // permission dans les réglages du navigateur.
-    const NOTIF_FLAG  = 'allops-notifs-actives';
-    const notifToggle = document.getElementById('notifToggle');
-    const iconBellOn  = document.getElementById('iconBellOn');
-    const iconBellOff = document.getElementById('iconBellOff');
+    const NOTIF_FLAG   = 'allops-notifs-actives';
+    const ICONE_CLOCHE = "{{ url_for('static', filename='icons/notif-bell.svg') }}";
+    const notifToggle  = document.getElementById('notifToggle');
 
     function notifsActives() {
       return !!window.Notification
@@ -217,19 +216,49 @@
         && localStorage.getItem(NOTIF_FLAG) === '1';
     }
 
+    // Les icônes cloche sont remplacées par Lucide (createIcons()) après le
+    // premier rendu : les références obtenues une seule fois au chargement
+    // pointent alors sur des <i> détachés du DOM, et changer leur
+    // style.display ne se voit plus à l'écran tant que la page n'est pas
+    // rechargée. On requête donc les éléments à jour à chaque appel.
     function majIconeCloche() {
       if (!notifToggle) return;
-      const actif = notifsActives();
-      iconBellOn.style.display  = actif ? 'block' : 'none';
-      iconBellOff.style.display = actif ? 'none' : 'block';
+      const actif   = notifsActives();
+      const bellOn  = document.getElementById('iconBellOn');
+      const bellOff = document.getElementById('iconBellOff');
+      if (bellOn)  bellOn.style.display  = actif ? 'block' : 'none';
+      if (bellOff) bellOff.style.display = actif ? 'none' : 'block';
+    }
+
+    // Demande la permission navigateur puis active le drapeau applicatif.
+    // Exposée sur AllOpsNotify pour être appelée depuis n'importe quelle
+    // page (ex : au démarrage d'un minuteur avec une durée cible), pas
+    // uniquement depuis la cloche du bandeau.
+    async function activerNotifications() {
+      if (!window.Notification) return false;
+      let permission = Notification.permission;
+      if (permission === 'default') {
+        permission = await Notification.requestPermission();
+      }
+      if (permission === 'granted') {
+        localStorage.setItem(NOTIF_FLAG, '1');
+        majIconeCloche();
+        return true;
+      }
+      return false;
     }
 
     window.AllOpsNotify = {
       actives: notifsActives,
-      envoyer(titre, options) {
+      activer: activerNotifications,
+      envoyer(titre, options = {}) {
         if (!notifsActives()) return null;
-        try { return new Notification(titre, options); }
-        catch (e) { console.warn('Notification impossible :', e); return null; }
+        try {
+          return new Notification(titre, { icon: ICONE_CLOCHE, ...options });
+        } catch (e) {
+          console.warn('Notification impossible :', e);
+          return null;
+        }
       },
     };
 
@@ -244,14 +273,11 @@
           majIconeCloche();
           return;
         }
-        let permission = Notification.permission;
-        if (permission === 'default') {
-          permission = await Notification.requestPermission();
-        }
-        if (permission === 'granted') {
-          localStorage.setItem(NOTIF_FLAG, '1');
-          majIconeCloche();
-          new Notification('AllOps', { body: 'Notifications activées ✅' });
+        const activee = await activerNotifications();
+        if (activee) {
+          window.AllOpsNotify.envoyer('Notifications activées', {
+            body: 'Tu recevras désormais les alertes AllOps sur cet appareil.',
+          });
         }
       });
 
@@ -270,7 +296,7 @@
           ? "Échéance aujourd'hui"
           : `Échéance dans ${el.jours_restants} jour${el.jours_restants > 1 ? 's' : ''}`;
 
-        window.AllOpsNotify.envoyer(`AllOps — ${libelle}`, { body: el.titre });
+        window.AllOpsNotify.envoyer(libelle, { body: el.titre, icon: ICONE_CLOCHE });
       });
     }
 
